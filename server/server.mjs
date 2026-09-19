@@ -12,10 +12,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const dataPath = path.join(__dirname, 'data.json')
 const app = express()
 const port = Number(process.env.PORT || 8787)
-const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017'
+const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true'
+const mongoUri = process.env.MONGODB_URI || (isProduction ? '' : 'mongodb://127.0.0.1:27017')
 const mongoDbName = process.env.MONGODB_DB || 'ledgerly'
-const jwtSecret = process.env.JWT_SECRET || 'local-development-secret-change-me'
-const mongoClient = new MongoClient(mongoUri, { maxPoolSize: 10, minPoolSize: 0, serverSelectionTimeoutMS: 5000, connectTimeoutMS: 5000 })
+const jwtSecret = process.env.JWT_SECRET || (isProduction ? '' : 'local-development-secret-change-me')
+let mongoClient
 let database
 
 app.use(cors())
@@ -168,6 +169,9 @@ app.use((request, response, next) => {
 })
 
 async function start() {
+  if (!mongoUri) throw new Error('MONGODB_URI is required in production. Set it to your MongoDB Atlas connection string in Render environment variables.')
+  if (!jwtSecret) throw new Error('JWT_SECRET is required in production. Set a strong secret in Render environment variables.')
+  mongoClient = new MongoClient(mongoUri, { maxPoolSize: 10, minPoolSize: 0, serverSelectionTimeoutMS: 5000, connectTimeoutMS: 5000 })
   await mongoClient.connect()
   database = mongoClient.db(mongoDbName)
   await database.collection('inventory').dropIndex('sku_1').catch(() => undefined)

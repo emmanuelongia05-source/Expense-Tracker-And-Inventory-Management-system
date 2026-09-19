@@ -81,7 +81,7 @@ The repository includes `render.yaml` for a single Render web service. The servi
 1. Create a MongoDB Atlas cluster and database user. Add `0.0.0.0/0` to the Atlas network access list for the first deployment, or restrict it to Render outbound IPs when available.
 2. Push this repository to GitHub.
 3. In Render, choose **New > Blueprint**, connect the repository, and select `render.yaml`.
-4. Add the generated `MONGODB_URI` secret in the Render service environment. Use the Atlas SRV connection string, for example `mongodb+srv://...`.
+4. Add `MONGODB_URI` in the Render service environment. Use the Atlas SRV connection string, for example `mongodb+srv://username:password@cluster.mongodb.net/ledgerly?retryWrites=true&w=majority`. Do not leave it blank or use `mongodb://127.0.0.1:27017` on Render.
 5. Deploy. Render provides an HTTPS URL such as `https://ledgerly.onrender.com`.
 
 The public URL serves the dashboard, while `/api/health` verifies the live API. Do not commit `.env`, MongoDB credentials, or API keys.
