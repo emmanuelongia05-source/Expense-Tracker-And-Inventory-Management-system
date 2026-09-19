@@ -1,0 +1,14 @@
+{
+  "expenses": [
+    { "id": 1, "description": "Wholesale coffee beans", "category": "Inventory", "date": "Today, 09:42", "amount": 1840 },
+    { "id": 2, "description": "Shop rent - September", "category": "Operations", "date": "Sep 16, 2024", "amount": 2200 },
+    { "id": 3, "description": "Social media campaign", "category": "Marketing", "date": "Sep 14, 2024", "amount": 480 },
+    { "id": 4, "description": "Packaging supplies", "category": "Inventory", "date": "Sep 12, 2024", "amount": 365 }
+  ],
+  "inventory": [
+    { "id": 1, "name": "House Blend Coffee", "sku": "COF-001", "category": "Coffee", "stock": 42, "reorderAt": 20, "value": 1260 },
+    { "id": 2, "name": "Ceramic Mug - White", "sku": "MER-014", "category": "Merchandise", "stock": 8, "reorderAt": 12, "value": 184 },
+    { "id": 3, "name": "Cold Brew Bottle", "sku": "DRK-022", "category": "Drinks", "stock": 0, "reorderAt": 10, "value": 0 },
+    { "id": 4, "name": "Oat Milk 1L", "sku": "SUP-008", "category": "Supplies", "stock": 26, "reorderAt": 8, "value": 130 }
+  ]
+}
