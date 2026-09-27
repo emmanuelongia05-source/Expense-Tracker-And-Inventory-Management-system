@@ -109,7 +109,12 @@ async function generateAiInsights(data) {
   return { ...JSON.parse(result.choices[0].message.content), provider: 'openai' }
 }
 
-app.get('/api/health', (_request, response) => response.json({ status: database ? 'ok' : 'starting', service: 'ledgerly-api', database: mongoDbName }))
+app.get('/api/health', (_request, response) => response.status(database ? 200 : 503).json({ status: database ? 'ok' : 'starting', service: 'ledgerly-api', database: mongoDbName }))
+app.use('/api', (request, response, next) => {
+  if (request.path === '/health') return next()
+  if (!database) return response.status(503).json({ error: 'Database is still connecting. Please try again shortly.' })
+  next()
+})
 app.post('/api/auth/register', async (request, response) => {
   const username = String(request.body.username || '').trim().toLowerCase()
   const email = String(request.body.email || '').trim().toLowerCase()
@@ -168,26 +173,48 @@ app.use((request, response, next) => {
   response.sendFile(path.join(frontendPath, 'index.html'))
 })
 
-async function start() {
-  if (!mongoUri) throw new Error('MONGODB_URI is required in production. Set it to your MongoDB Atlas connection string in Render environment variables.')
-  if (!jwtSecret) throw new Error('JWT_SECRET is required in production. Set a strong secret in Render environment variables.')
-  mongoClient = new MongoClient(mongoUri, { maxPoolSize: 10, minPoolSize: 0, serverSelectionTimeoutMS: 5000, connectTimeoutMS: 5000 })
-  await mongoClient.connect()
-  database = mongoClient.db(mongoDbName)
-  await database.collection('inventory').dropIndex('sku_1').catch(() => undefined)
-  await Promise.all([
-      database.collection('users').createIndex({ username: 1 }, { unique: true }),
-      database.collection('users').createIndex({ email: 1 }, { unique: true }),
-      database.collection('expenses').createIndex({ userId: 1, category: 1 }),
-      database.collection('expenses').createIndex({ id: -1 }, { unique: true }),
-      database.collection('inventory').createIndex({ userId: 1, sku: 1 }, { unique: true }),
-    database.collection('inventory').createIndex({ stock: 1, reorderAt: 1 }),
-  ])
-  app.listen(port, () => console.log(`Ledgerly API running at http://localhost:${port} using MongoDB database ${mongoDbName}`))
+async function connectDatabase() {
+  if (!mongoUri) {
+    console.error('MONGODB_URI is required. Set it to your MongoDB Atlas connection string in Render environment variables.')
+    return
+  }
+  if (!jwtSecret) {
+    console.error('JWT_SECRET is required. Set a strong secret in Render environment variables.')
+    return
+  }
+
+  const client = new MongoClient(mongoUri, { maxPoolSize: 10, minPoolSize: 0, serverSelectionTimeoutMS: 10000, connectTimeoutMS: 10000 })
+  try {
+    await client.connect()
+    const connectedDatabase = client.db(mongoDbName)
+    await connectedDatabase.collection('inventory').dropIndex('sku_1').catch(() => undefined)
+    await Promise.all([
+      connectedDatabase.collection('users').createIndex({ username: 1 }, { unique: true }),
+      connectedDatabase.collection('users').createIndex({ email: 1 }, { unique: true }),
+      connectedDatabase.collection('expenses').createIndex({ userId: 1, category: 1 }),
+      connectedDatabase.collection('expenses').createIndex({ id: -1 }, { unique: true }),
+      connectedDatabase.collection('inventory').createIndex({ userId: 1, sku: 1 }, { unique: true }),
+      connectedDatabase.collection('inventory').createIndex({ stock: 1, reorderAt: 1 }),
+    ])
+    mongoClient = client
+    database = connectedDatabase
+    console.log(`MongoDB connected: database ${mongoDbName}`)
+  } catch (error) {
+    await client.close().catch(() => undefined)
+    console.error(`MongoDB connection failed: ${error.message}`)
+    console.error('Check MONGODB_URI and Atlas Network Access. Retrying in 15 seconds.')
+    setTimeout(connectDatabase, 15000).unref()
+  }
 }
 
-start().catch((error) => {
-  console.error(`Unable to connect to MongoDB at ${mongoUri}`)
-  console.error(error.message)
-  process.exitCode = 1
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`Ledgerly API listening on 0.0.0.0:${port}`)
+  connectDatabase()
 })
+
+function shutdown() {
+  server.close(() => mongoClient?.close().finally(() => process.exit(0)))
+}
+
+process.on('SIGTERM', shutdown)
+process.on('SIGINT', shutdown)
