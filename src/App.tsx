@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes, CalendarDays, Car, ChevronDown, CircleDollarSign, Dumbbell, GraduationCap, HeartPulse, Home, LayoutDashboard, LogIn, MoreHorizontal, PackagePlus, Plus, Receipt, Search, Settings, ShieldCheck, ShoppingCart, Sparkles, Store, Ticket, Users, Utensils, Wallet, X } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes, CalendarDays, Car, ChevronDown, CircleDollarSign, Dumbbell, Eye, EyeOff, Globe2, GraduationCap, HeartPulse, Home, LayoutDashboard, LogIn, MoreHorizontal, PackagePlus, Plus, Receipt, Search, Settings, ShieldCheck, ShoppingCart, Sparkles, Store, Ticket, Users, Utensils, Wallet, X } from 'lucide-react'
 import './App.css'
 
 type Expense = { id: number; description: string; category: string; date: string; amount: number; color: string }
@@ -32,6 +32,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [identifier, setIdentifier] = useState('')
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
@@ -59,17 +60,17 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user
 
   return <main className="auth-shell">
     <section className="auth-card">
-      <div className="auth-brand"><span className="brand-mark"><CircleDollarSign size={21} /></span><span><strong>Ledgerly</strong><small>Expense & Inventory Management</small></span></div>
+      <div className="auth-brand"><span className="brand-mark"><CircleDollarSign size={21} /></span><span><strong>Ledgerly</strong><small>Expense & Inventory Management</small></span><span className="auth-language"><Globe2 size={12} /> English <ChevronDown size={12} /></span></div>
       <span className="auth-security"><ShieldCheck size={14} /> Secure · Reliable · Built for your business</span>
       <div className="auth-copy"><h1>{mode === 'login' ? <>Welcome back <span>👋</span></> : 'Create your account'}</h1><p>{mode === 'login' ? 'Sign in to access your expenses, inventory, and grow your business.' : 'Set up a secure account to manage your business.'}</p></div>
       <form onSubmit={submit} className="auth-form">
         {mode === 'login' ? <label>Email or username<input value={identifier} onChange={(event) => setIdentifier(event.target.value)} autoComplete="username" placeholder="you@example.com" required /></label> : <><label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="Choose a username" required /></label><label>Email address<input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label></>}
-        <label>Password<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder={mode === 'login' ? 'Enter your password' : 'At least 8 characters'} minLength={8} required /></label>
+        <label>Password<span className="password-field"><input value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder={mode === 'login' ? 'Enter your password' : 'At least 8 characters'} minLength={8} required /><button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={15} /> : <Eye size={15} />}</button></span></label>
         {mode === 'login' && <div className="auth-options"><label className="remember-option"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> Remember me</label><button type="button" className="forgot-link" onClick={() => setError('Password reset is not configured yet. Contact your business administrator to regain access.')}>Forgot password?</button></div>}
         {error && <p className="auth-error">{error}</p>}
         <button className="button primary auth-submit" disabled={loading}><LogIn size={16} /> {loading ? 'Please wait...' : mode === 'login' ? 'Sign in securely' : 'Create account'}</button>
       </form>
-      {mode === 'login' && <div className="auth-social-note"><span>or continue with</span><small>Social sign-in is not enabled for this workspace.</small></div>}
+      {mode === 'login' && <div className="auth-social-note"><span>or continue with</span><div className="auth-provider-row"><button type="button" disabled title="Google sign-in is not configured"><b className="google-mark">G</b>Google</button><button type="button" disabled title="Microsoft sign-in is not configured"><b className="microsoft-mark"><i /><i /><i /><i /></b>Microsoft</button><button type="button" disabled title="Apple sign-in is not configured"><b className="apple-mark">●</b>Apple</button></div></div>}
       <p className="auth-switch">{mode === 'login' ? 'New to Ledgerly?' : 'Already have an account?'} <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>{mode === 'login' ? 'Create an account' : 'Sign in'}</button></p>
     </section>
     <aside className="auth-aside auth-showcase">
