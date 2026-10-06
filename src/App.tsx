@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes, CalendarDays, Car, ChevronDown, CircleDollarSign, Dumbbell, Eye, EyeOff, Globe2, GraduationCap, HeartPulse, Home, LayoutDashboard, LogIn, MoreHorizontal, PackagePlus, Plus, Receipt, Search, Settings, ShieldCheck, ShoppingCart, Sparkles, Store, Ticket, Users, Utensils, Wallet, X } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes, CalendarDays, Car, ChevronDown, CircleDollarSign, Dumbbell, Eye, EyeOff, GraduationCap, HeartPulse, Home, LayoutDashboard, LogIn, Moon, MoreHorizontal, PackagePlus, Plus, Receipt, Search, Settings, ShoppingCart, Sparkles, Store, Sun, Ticket, Utensils, Wallet, X } from 'lucide-react'
 import './App.css'
 
 type Expense = { id: number; description: string; category: string; date: string; amount: number; color: string }
@@ -25,14 +25,13 @@ type AuthUser = { username: string; email: string }
 
 function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user: AuthUser, remember: boolean) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [previewDate] = useState(() => new Date())
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
   const [previewExpenses] = useState(initialExpenses.reduce((sum, expense) => sum + expense.amount, 0))
-  const [previewInventoryValue] = useState(initialInventory.reduce((sum, item) => sum + item.value, 0))
-  const [previewAlerts] = useState(initialInventory.filter((item) => item.status !== 'In stock').length)
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [capsLock, setCapsLock] = useState(false)
   const [identifier, setIdentifier] = useState('')
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
@@ -58,29 +57,29 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user
     }
   }
 
-  return <main className="auth-shell">
-    <section className="auth-card">
-      <div className="auth-brand"><span className="brand-mark"><CircleDollarSign size={21} /></span><span><strong>Ledgerly</strong><small>Expense & Inventory Management</small></span><span className="auth-language"><Globe2 size={12} /> English <ChevronDown size={12} /></span></div>
-      <span className="auth-security"><ShieldCheck size={14} /> Secure · Reliable · Built for your business</span>
-      <div className="auth-copy"><h1>{mode === 'login' ? <>Welcome back <span>👋</span></> : 'Create your account'}</h1><p>{mode === 'login' ? 'Sign in to access your expenses, inventory, and grow your business.' : 'Set up a secure account to manage your business.'}</p></div>
-      <form onSubmit={submit} className="auth-form">
-        {mode === 'login' ? <label>Email or username<input value={identifier} onChange={(event) => setIdentifier(event.target.value)} autoComplete="username" placeholder="you@example.com" required /></label> : <><label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="Choose a username" required /></label><label>Email address<input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label></>}
-        <label>Password<span className="password-field"><input value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder={mode === 'login' ? 'Enter your password' : 'At least 8 characters'} minLength={8} required /><button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={15} /> : <Eye size={15} />}</button></span></label>
-        {mode === 'login' && <div className="auth-options"><label className="remember-option"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> Remember me</label><button type="button" className="forgot-link" onClick={() => setError('Password reset is not configured yet. Contact your business administrator to regain access.')}>Forgot password?</button></div>}
-        {error && <p className="auth-error">{error}</p>}
-        <button className="button primary auth-submit" disabled={loading}><LogIn size={16} /> {loading ? 'Please wait...' : mode === 'login' ? 'Sign in securely' : 'Create account'}</button>
-      </form>
-      {mode === 'login' && <div className="auth-social-note"><span>or continue with</span><div className="auth-provider-row"><button type="button" disabled title="Google sign-in is not configured"><b className="google-mark">G</b>Google</button><button type="button" disabled title="Microsoft sign-in is not configured"><b className="microsoft-mark"><i /><i /><i /><i /></b>Microsoft</button><button type="button" disabled title="Apple sign-in is not configured"><b className="apple-mark">●</b>Apple</button></div></div>}
-      <p className="auth-switch">{mode === 'login' ? 'New to Ledgerly?' : 'Already have an account?'} <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>{mode === 'login' ? 'Create an account' : 'Sign in'}</button></p>
-    </section>
-    <aside className="auth-aside auth-showcase">
-      <div className="showcase-trust"><span /> Trusted by growing businesses</div>
-      <div className="showcase-copy"><span className="showcase-kicker">Simple&nbsp; · &nbsp;Smart&nbsp; · &nbsp;Powerful</span><h2>Make every<br /><em>shilling</em> count.</h2><p>Track expenses, manage inventory, and get real-time insights — all in one place. Spend less time worrying and more time growing.</p></div>
-      <div className="showcase-features"><div><i className="feature-green"><BarChart3 size={18} /></i><span><strong>Track expenses</strong><small>Know where your money goes</small></span></div><div><i className="feature-blue"><Boxes size={18} /></i><span><strong>Manage inventory</strong><small>Stay on top of your stock</small></span></div><div><i className="feature-violet"><Receipt size={18} /></i><span><strong>Insightful reports</strong><small>Make data-driven decisions</small></span></div><div><i className="feature-orange"><Users size={18} /></i><span><strong>Manage your business</strong><small>Keep daily operations organized</small></span></div></div>
-      <div className="showcase-preview"><div className="preview-top"><span><b /> Ledgerly</span><span>{previewDate.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</span></div><div className="preview-metrics"><div><small>Expenses</small><strong>{money(previewExpenses)}</strong></div><div><small>Stock value</small><strong>{money(previewInventoryValue)}</strong></div><div><small>Alerts</small><strong>{previewAlerts}</strong></div></div><div className="preview-content"><div className="preview-donut" /><div className="preview-lines"><i /><i /><i /><i /></div></div><div className="preview-footer"><span><i /> Business overview</span><span>{initialInventory.length} sample products</span></div></div>
-      <blockquote>“Better tracking.<br />Smarter decisions.”<small>— Ledgerly</small></blockquote>
-      <div className="showcase-orbit orbit-one" /><div className="showcase-orbit orbit-two" />
+  return <main className={`auth-reference ${theme}`}>
+    <aside className="auth-reference-side">
+      <div className="ref-brand"><span className="ref-brand-icon"><Boxes size={23} /></span><strong>Ledgerly</strong></div>
+      <div className="ref-intro"><h1>Expense Tracker &amp;<br />Inventory Management</h1><p>Smarter control over your expenses, inventory and suppliers, all in one place.</p></div>
+      <section className="ref-board" aria-label="Sample workspace overview"><div className="ref-board-head"><div><strong>{money(previewExpenses)}</strong><span>Sample total expenses</span></div><div><strong>{initialInventory.reduce((sum, item) => sum + item.stock, 0).toLocaleString()}</strong><span>Units in inventory</span></div></div>{initialInventory.map((item) => { const color = item.status === 'In stock' ? '#4ade80' : item.status === 'Low stock' ? '#fbbf24' : '#fb7185'; const percent = Math.max(5, Math.min(100, Math.round((item.stock / Math.max(item.reorderAt * 2, 1)) * 100))); return <div className="ref-stock-row" key={item.id}><span>{item.name}</span><div className="ref-stock-bar"><i style={{ width: `${percent}%`, background: color }} /></div><b style={{ color }}>{item.status === 'Out of stock' ? 'Out' : item.status === 'Low stock' ? 'Low' : `${item.stock} left`}</b></div> })}<small className="ref-sample-caption">Illustrative preview · sample products</small></section>
+      <div className="ref-benefits"><span>Track expenses</span><span>Manage inventory</span><span>Stock alerts</span><span>Reports</span></div>
     </aside>
+    <section className="auth-reference-main">
+      <button className="ref-theme-toggle" type="button" onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}><span>{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}</span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button>
+      <div className="ref-form-wrap"><h2>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h2><p className="ref-subtitle">{mode === 'login' ? 'Sign in to your expense and inventory dashboard.' : 'Create an account to manage your business.'}</p>
+        <form onSubmit={submit} className="ref-form">
+          {mode === 'login' ? <div className="ref-field"><label htmlFor="auth-identifier">Username or email</label><input id="auth-identifier" value={identifier} onChange={(event) => setIdentifier(event.target.value)} autoComplete="username" placeholder="you@business.com" required /></div> : <><div className="ref-field"><label htmlFor="auth-username">Username</label><input id="auth-username" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="Choose a username" required /></div><div className="ref-field"><label htmlFor="auth-email">Email</label><input id="auth-email" value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" placeholder="you@business.com" required /></div></>}
+          <div className="ref-field"><label htmlFor="auth-password">Password</label><div className="ref-password"><input id="auth-password" value={password} onChange={(event) => setPassword(event.target.value)} onKeyUp={(event) => setCapsLock(event.getModifierState('CapsLock'))} onKeyDown={(event) => setCapsLock(event.getModifierState('CapsLock'))} onBlur={() => setCapsLock(false)} type={showPassword ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="Enter your password" minLength={8} required /><button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div>{capsLock && <p className="ref-caps" role="status">Caps Lock is on.</p>}</div>
+          {mode === 'login' && <div className="ref-options"><label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> Keep me signed in</label><button type="button" onClick={() => setError('Password reset is not configured yet. Contact your business administrator.')}>Forgot password?</button></div>}
+          {error && <p className="ref-error" role="alert">{error}</p>}
+          <button className="ref-submit" type="submit" disabled={loading}><span>{loading && <i className="ref-spinner" />}</span>{loading ? 'Signing in...' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
+        </form>
+        {mode === 'login' && <><div className="ref-or">or</div><button className="ref-google" type="button" disabled title="Google sign-in is not configured"><b>G</b> Continue with Google</button></>}
+        <p className="ref-account-switch">{mode === 'login' ? 'New to Ledgerly?' : 'Already have an account?'} <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>{mode === 'login' ? 'Create an account' : 'Sign in'}</button></p>
+        <section className="ref-help"><h3>Need help?</h3><p>Can’t sign in or have a question? Contact your workspace administrator.</p></section>
+        <nav className="ref-legal" aria-label="Legal links"><a href="#terms">Terms</a><a href="#privacy">Privacy</a><a href="#help">Help centre</a></nav>
+      </div>
+    </section>
   </main>
 }
 
