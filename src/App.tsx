@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes, CalendarDays, Car, ChevronDown, CircleDollarSign, Dumbbell, Eye, EyeOff, GraduationCap, HeartPulse, Home, LayoutDashboard, LogIn, Moon, MoreHorizontal, PackagePlus, Plus, Receipt, Search, Settings, ShoppingCart, Sparkles, Store, Sun, Ticket, Utensils, Wallet, X } from 'lucide-react'
 import './App.css'
+import './Workspace.css'
 
 type Expense = { id: number; description: string; category: string; date: string; amount: number; color: string }
 type InventoryItem = { id: number; name: string; sku: string; category: string; stock: number; reorderAt: number; value: number; status: 'In stock' | 'Low stock' | 'Out of stock' }
@@ -115,9 +116,103 @@ function App() {
   const runAnalysis = () => { setAnalysisLoading(true); fetch('/api/analysis', { method: 'POST', headers: authHeaders, body: JSON.stringify({ expenses, inventory }) }).then((response) => response.json()).then(setInsights).catch(() => notify('Unable to run analysis')).finally(() => setAnalysisLoading(false)) }
   const addExpense = (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); const expense = { description: String(data.get('description') || 'New expense'), category: String(data.get('category') || 'Operations'), amount: Number(data.get('amount')) || 0 }; setExpenses((current) => [{ id: Date.now(), ...expense, date: 'Just now', color: 'peach' }, ...current]); fetch('/api/expenses', { method: 'POST', headers: authHeaders, body: JSON.stringify(expense) }).catch(() => undefined); setShowExpenseForm(false); notify('Expense added to your ledger') }
   const addItem = (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); const item = { name: String(data.get('name') || 'New item'), sku: String(data.get('sku') || 'NEW-001'), category: String(data.get('category') || 'Other'), stock: Number(data.get('stock')) || 0, reorderAt: Number(data.get('reorderAt')) || 0, value: Number(data.get('value')) || 0 }; const status = item.stock === 0 ? 'Out of stock' : item.stock <= item.reorderAt ? 'Low stock' : 'In stock'; setInventory((current) => [...current, { id: Date.now(), ...item, status }]); fetch('/api/inventory', { method: 'POST', headers: authHeaders, body: JSON.stringify(item) }).catch(() => undefined); setShowItemForm(false); notify('Inventory item added') }
+  const renderWorkspacePage = () => {
+    const descriptions: Record<string, string> = {
+      Expenses: 'Review and record your business spending.',
+      Inventory: 'Track stock levels, product value, and items to reorder.',
+      Sales: 'Sales records are not yet available in this workspace.',
+      Reports: 'Review spending patterns and business health.',
+      Categories: 'See how your expenses are distributed by category.',
+      Suppliers: 'Supplier records are not yet available in this workspace.',
+      Settings: 'Manage your signed-in workspace account.',
+    }
+
+    return <section className="page-view">
+      <header className="page-view-heading">
+        <div>
+          <p className="eyebrow">{activeNav} · Workspace</p>
+          <h1>{activeNav}</h1>
+          <p className="subheading">{descriptions[activeNav] || 'Workspace details'}</p>
+        </div>
+        <div className="heading-actions">
+          {activeNav === 'Expenses' && <button className="button primary" onClick={() => setShowExpenseForm(true)}><Plus size={17} /> Add expense</button>}
+          {activeNav === 'Inventory' && <button className="button primary" onClick={() => setShowItemForm(true)}><PackagePlus size={17} /> Add inventory</button>}
+          {activeNav === 'Categories' && <button className="button primary" onClick={() => setShowExpenseForm(true)}><Plus size={17} /> Add expense</button>}
+        </div>
+      </header>
+
+      {activeNav === 'Expenses' && <section className="panel workspace-panel">
+        <div className="panel-heading"><div><h2>All expenses</h2><p>{filteredExpenses.length} matching records · Total {money(totalExpenses)}</p></div></div>
+        <div className="expense-list">
+          {filteredExpenses.length ? filteredExpenses.map((expense) => <div className="expense-row" key={expense.id}>
+            <div className={`expense-icon ${expense.color}`}><Receipt size={17} /></div>
+            <div className="expense-name"><strong>{expense.description}</strong><span>{expense.category} <b>·</b> {expense.date}</span></div>
+            <strong className="expense-amount">-{money(expense.amount)}</strong>
+          </div>) : <div className="workspace-empty"><Receipt size={25} /><strong>No matching expenses</strong><span>Try another search or add a new expense.</span></div>}
+        </div>
+      </section>}
+
+      {activeNav === 'Inventory' && <section className="panel workspace-panel">
+        <div className="panel-heading"><div><h2>All inventory</h2><p>{filteredInventory.length} matching products · Total value {money(inventoryValue)}</p></div></div>
+        <div className="inventory-table workspace-inventory">
+          <div className="table-header"><span>Product</span><span>Stock</span><span>Value</span></div>
+          {filteredInventory.length ? filteredInventory.map((item) => <div className="table-row" key={item.id}>
+            <div className="table-product"><span className="product-thumb"><Boxes size={16} /></span><span><strong>{item.name}</strong><small>{item.sku} · {item.category}</small></span></div>
+            <span className={`stock-count ${item.status === 'Low stock' ? 'warning' : item.status === 'Out of stock' ? 'danger' : ''}`}>{item.stock} · {item.status}</span>
+            <strong>{money(item.value)}</strong>
+          </div>) : <div className="workspace-empty"><Boxes size={25} /><strong>No matching products</strong><span>Try another search or add an inventory item.</span></div>}
+        </div>
+      </section>}
+
+      {activeNav === 'Reports' && <div className="workspace-report-grid">
+        <section className="panel">
+          <div className="panel-heading"><div><h2>Expense breakdown</h2><p>Recorded spending by category</p></div></div>
+          {categoryBreakdown.length ? <div className="workspace-category-list">{categoryBreakdown.map((category) => <div className="workspace-category-row" key={category.name}>
+            <span>{category.name}</span><strong>{money(category.amount)}</strong><small>{category.percent}%</small><i><b style={{ width: `${category.percent}%` }} /></i>
+          </div>)}</div> : <div className="workspace-empty"><BarChart3 size={25} /><strong>No report data yet</strong><span>Add expenses to see a spending breakdown.</span></div>}
+        </section>
+        <section className="panel">
+          <div className="panel-heading"><div><h2>Business analysis</h2><p>Recommendations from current expenses and stock.</p></div></div>
+          <button className="button primary workspace-analysis-button" onClick={runAnalysis} disabled={analysisLoading}><Sparkles size={15} />{analysisLoading ? 'Analyzing...' : 'Run analysis'}</button>
+          {insights && <div className="workspace-insights"><strong>{insights.summary}</strong>{insights.insights.map((insight, index) => <p key={`${insight.title}-${index}`}><b>{insight.title}</b><br />{insight.detail}</p>)}</div>}
+        </section>
+      </div>}
+
+      {activeNav === 'Categories' && <section className="panel workspace-panel">
+        <div className="panel-heading"><div><h2>Expense categories</h2><p>Spending totals based on your recorded expenses.</p></div></div>
+        <div className="workspace-category-list">
+          {expenseCategories.map(({ name, icon: Icon, color }) => {
+            const amount = categoryTotals[name] || 0
+            const percent = totalExpenses ? Math.round((amount / totalExpenses) * 100) : 0
+            return <div className="workspace-category-row" key={name}>
+              <span className={`category-icon ${color}`}><Icon size={16} />{name}</span><strong>{money(amount)}</strong><small>{percent}%</small><i><b style={{ width: `${percent}%` }} /></i>
+            </div>
+          })}
+          {Object.entries(categoryTotals).filter(([name]) => !expenseCategories.some((category) => category.name === name)).map(([name, amount]) => {
+            const percent = totalExpenses ? Math.round((amount / totalExpenses) * 100) : 0
+            return <div className="workspace-category-row" key={name}><span>{name}</span><strong>{money(amount)}</strong><small>{percent}%</small><i><b style={{ width: `${percent}%` }} /></i></div>
+          })}
+        </div>
+      </section>}
+
+      {(activeNav === 'Sales' || activeNav === 'Suppliers') && <section className="panel workspace-panel workspace-empty">
+        <ShoppingCart size={28} />
+        <strong>{activeNav} tracking is not configured yet</strong>
+        <span>This workspace currently tracks expenses and inventory. No {activeNav.toLowerCase()} records are available to display.</span>
+        <button className="button secondary" onClick={() => setActiveNav('Inventory')}>Open inventory</button>
+      </section>}
+
+      {activeNav === 'Settings' && <section className="panel workspace-panel settings-panel">
+        <div className="panel-heading"><div><h2>Workspace account</h2><p>Signed-in account details and access.</p></div></div>
+        <dl><div><dt>Username</dt><dd>{currentUser?.username || 'Business owner'}</dd></div><div><dt>Email</dt><dd>{currentUser?.email || 'Not provided'}</dd></div><div><dt>Workspace</dt><dd>Business workspace</dd></div></dl>
+        <button className="button secondary" onClick={logout}><LogIn size={16} /> Log out</button>
+      </section>}
+    </section>
+  }
+
   if (!token) return <AuthScreen onAuthenticated={handleAuthenticated} />
-  return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><span className="brand-mark"><CircleDollarSign size={20} /></span><span className="brand-copy"><strong>Ledgerly</strong><small>Expense Tracker & Inventory</small></span></div><div className="workspace-switcher"><span className="avatar">{currentUser?.username.slice(0, 2).toUpperCase() || 'BU'}</span><span><strong>{currentUser?.username || 'My business'}</strong><small>Business workspace</small></span><ChevronDown size={15} /></div><nav className="main-nav" aria-label="Main navigation"><p className="nav-label">Workspace</p>{navItems.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${activeNav === label ? 'active' : ''}`} onClick={() => setActiveNav(label)}><Icon size={18} /><span>{label}</span>{label === 'Inventory' && stockAlerts > 0 && <span className="nav-badge">{stockAlerts}</span>}</button>)}<button className="nav-item" onClick={() => setActiveNav('Categories')}><Ticket size={18} /><span>Categories</span></button><button className="nav-item" onClick={() => notify('Supplier management is coming soon')}><ShoppingCart size={18} /><span>Suppliers</span></button><p className="nav-label nav-label-lower">Manage</p><button className="nav-item" onClick={() => notify('Settings are coming soon')}><Settings size={18} /><span>Settings</span></button></nav><section className="sidebar-health"><div className="health-label"><span><i /> Business health</span><span>{inventoryHealth}%</span></div><div className="health-ring" style={{ background: `conic-gradient(#11d6ae ${inventoryHealth}%, #25436a ${inventoryHealth}% 100%)` }}><span><strong>{inventoryHealth}%</strong><small>In stock</small></span></div><div className="health-caption"><ArrowUpRight size={14} /> {inventory.length - stockAlerts}/{inventory.length} products available</div><small className="health-quote">“Better tracking.<br />Smarter decisions.”</small></section><button className="nav-item logout-nav" onClick={logout}><LogIn size={18} /><span>Log out</span></button></aside>
+  return <div className={`app-shell page-${activeNav.toLowerCase()}`}>
+    <aside className="sidebar"><div className="brand"><span className="brand-mark"><CircleDollarSign size={20} /></span><span className="brand-copy"><strong>Ledgerly</strong><small>Expense Tracker & Inventory</small></span></div><div className="workspace-switcher"><span className="avatar">{currentUser?.username.slice(0, 2).toUpperCase() || 'BU'}</span><span><strong>{currentUser?.username || 'My business'}</strong><small>Business workspace</small></span><ChevronDown size={15} /></div><nav className="main-nav" aria-label="Main navigation"><p className="nav-label">Workspace</p>{navItems.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${activeNav === label ? 'active' : ''}`} onClick={() => setActiveNav(label)}><Icon size={18} /><span>{label}</span>{label === 'Inventory' && stockAlerts > 0 && <span className="nav-badge">{stockAlerts}</span>}</button>)}<button className={`nav-item ${activeNav === 'Categories' ? 'active' : ''}`} onClick={() => setActiveNav('Categories')}><Ticket size={18} /><span>Categories</span></button><button className={`nav-item ${activeNav === 'Suppliers' ? 'active' : ''}`} onClick={() => setActiveNav('Suppliers')}><ShoppingCart size={18} /><span>Suppliers</span></button><p className="nav-label nav-label-lower">Manage</p><button className={`nav-item ${activeNav === 'Settings' ? 'active' : ''}`} onClick={() => setActiveNav('Settings')}><Settings size={18} /><span>Settings</span></button></nav><section className="sidebar-health"><div className="health-label"><span><i /> Business health</span><span>{inventoryHealth}%</span></div><div className="health-ring" style={{ background: `conic-gradient(#11d6ae ${inventoryHealth}%, #25436a ${inventoryHealth}% 100%)` }}><span><strong>{inventoryHealth}%</strong><small>In stock</small></span></div><div className="health-caption"><ArrowUpRight size={14} /> {inventory.length - stockAlerts}/{inventory.length} products available</div><small className="health-quote">“Better tracking.<br />Smarter decisions.”</small></section><button className="nav-item logout-nav" onClick={logout}><LogIn size={18} /><span>Log out</span></button></aside>
     <main className="main-content"><header className="topbar"><div className="global-search"><Search size={17} /><input placeholder="Search expenses, products, or suppliers..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><div className="header-note"><span className="note-mark">✦</span><span>Consistent tracking<br />leads to greater growth.</span></div><div className="top-actions"><button className="date-pill" title={now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}><CalendarDays size={15} /> {now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</button><button className="icon-button" aria-label="Notifications" onClick={() => notify('You are all caught up')}><Bell size={18} /><i /></button><button className="account-profile" onClick={logout} title="Log out"><span className="top-avatar account-button">{currentUser?.username.slice(0, 2).toUpperCase() || 'BU'}</span><span className="profile-copy"><strong>{currentUser?.username || 'Business owner'}</strong><small>Business owner</small></span><ChevronDown size={14} /></button></div></header><div className="content-wrap">
       <section className="page-heading"><div><p className="eyebrow">{now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} <span className="current-time">· {now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span></p><h1>{timeGreeting(now)}, {currentUser?.username || 'there'} <span>👋</span></h1><p className="subheading">Here is what is happening with your business today.</p></div><div className="heading-actions"><button className="button secondary" onClick={() => setShowExpenseForm(true)}><Plus size={17} /> Add expense</button><button className="button primary" onClick={() => setShowItemForm(true)}><PackagePlus size={17} /> Add inventory</button></div></section>
       <section className="metric-grid reference-metrics" aria-label="Business summary"><article className="metric-card"><div className="metric-top"><span>Total expenses</span><span className="metric-icon green"><Wallet size={17} /></span></div><strong>{money(totalExpenses)}</strong><div className="metric-trend up"><ArrowDownRight size={14} /> {expenses.length} <span>recorded entries</span></div></article><article className="metric-card"><div className="metric-top"><span>Total inventory value</span><span className="metric-icon blue"><Boxes size={17} /></span></div><strong>{money(inventoryValue)}</strong><div className="metric-trend up"><ArrowUpRight size={14} /> {inventory.length} <span>tracked products</span></div></article><article className="metric-card"><div className="metric-top"><span>Expense categories</span><span className="metric-icon violet"><Receipt size={17} /></span></div><strong>{Object.keys(categoryTotals).length}</strong><div className="metric-trend neutral"><span>Categories with recorded spending</span></div></article><article className="metric-card"><div className="metric-top"><span>Stock alerts</span><span className="metric-icon orange"><Boxes size={17} /></span></div><strong>{stockAlerts}</strong><div className="metric-trend down"><ArrowDownRight size={14} /> {outOfStockCount} out of stock <span>· {lowStockCount} low</span></div></article></section>
@@ -127,6 +222,7 @@ function App() {
       <section className="dashboard-grid"><article className="panel chart-panel"><div className="panel-heading"><div><h2>Cash flow</h2><p>Income and expenses over time</p></div><select aria-label="Cash flow period"><option>Last 6 months</option><option>This year</option></select></div><div className="chart-legend"><span><i className="legend-income" /> Income</span><span><i className="legend-expense" /> Expenses</span></div><div className="chart"><div className="y-axis"><span>UGX 8k</span><span>UGX 6k</span><span>UGX 4k</span><span>UGX 2k</span><span>UGX 0</span></div><div className="chart-area"><div className="grid-lines"><i /><i /><i /><i /><i /></div><svg viewBox="0 0 620 190" preserveAspectRatio="none" role="img" aria-label="Cash flow trend chart"><path className="income-line" d="M0 138 C40 130 55 144 92 111 S143 125 180 89 S235 117 270 68 S320 97 362 80 S410 93 450 49 S505 77 545 32 S584 52 620 19" /><path className="expense-line" d="M0 160 C43 151 55 155 92 132 S142 147 180 116 S235 140 270 119 S320 124 362 101 S410 119 450 91 S500 116 545 85 S585 96 620 75" /><path className="income-fill" d="M0 138 C40 130 55 144 92 111 S143 125 180 89 S235 117 270 68 S320 97 362 80 S410 93 450 49 S505 77 545 32 S584 52 620 19 V190 H0 Z" /></svg><div className="x-axis"><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></div></div></div></article>
       <article className="panel stock-panel"><div className="panel-heading"><div><h2>Stock alerts</h2><p>Items that need your attention</p></div><button className="text-button" onClick={() => setActiveNav('Inventory')}>View all <ArrowUpRight size={15} /></button></div><div className="alert-list">{inventory.filter((item) => item.status !== 'In stock').map((item) => <div className="alert-row" key={item.id}><div className={`product-dot ${item.status === 'Out of stock' ? 'red' : 'orange'}`}><Boxes size={16} /></div><div className="alert-name"><strong>{item.name}</strong><span>{item.sku}</span></div><div className={`status ${item.status === 'Out of stock' ? 'out' : 'low'}`}>{item.status}</div><button className="more-button" aria-label={`More options for ${item.name}`}><MoreHorizontal size={17} /></button></div>)}</div><div className="stock-summary"><span><i className="dot red-dot" /> 1 out of stock</span><span><i className="dot orange-dot" /> 2 low stock</span></div></article></section>
       <section className="lower-grid"><article className="panel expense-panel"><div className="panel-heading"><div><h2>Recent expenses</h2><p>Keep an eye on where your money goes</p></div><button className="text-button" onClick={() => setActiveNav('Expenses')}>View all <ArrowUpRight size={15} /></button></div><div className="expense-list">{filteredExpenses.slice(0, 4).map((expense) => <div className="expense-row" key={expense.id}><div className={`expense-icon ${expense.color}`}><Receipt size={17} /></div><div className="expense-name"><strong>{expense.description}</strong><span>{expense.category} <b>•</b> {expense.date}</span></div><strong className="expense-amount">-{money(expense.amount)}</strong></div>)}</div></article><article className="panel inventory-panel"><div className="panel-heading"><div><h2>Inventory snapshot</h2><p>Your most valuable items</p></div><button className="text-button" onClick={() => setActiveNav('Inventory')}>Manage <ArrowUpRight size={15} /></button></div><div className="inventory-table"><div className="table-header"><span>Product</span><span>Stock</span><span>Value</span></div>{filteredInventory.slice(0, 3).map((item) => <div className="table-row" key={item.id}><div className="table-product"><span className="product-thumb"><Boxes size={16} /></span><span><strong>{item.name}</strong><small>{item.category}</small></span></div><span className={`stock-count ${item.status === 'Low stock' ? 'warning' : item.status === 'Out of stock' ? 'danger' : ''}`}>{item.stock} units</span><strong>{money(item.value)}</strong></div>)}</div><div className="table-search"><Search size={16} /><input placeholder="Search expenses and inventory..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></article></section>
+      {activeNav !== 'Overview' && renderWorkspacePage()}
     </div></main>
     {showExpenseForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowExpenseForm(false)}><form className="modal" onSubmit={addExpense}><div className="modal-header"><div><h2>Add expense</h2><p>Record a new business expense.</p></div><button type="button" className="close-button" onClick={() => setShowExpenseForm(false)} aria-label="Close"><X size={18} /></button></div><label>Description<input name="description" placeholder="e.g. Delivery supplies" required /></label><div className="form-row"><label>Category<select name="category"><option>Fixed expenses</option><option>Shopping</option><option>Food</option><option>Medical</option><option>Transportation</option><option>Fitness</option><option>Entertainment</option><option>Family & education</option><option>Operations</option><option>Inventory</option><option>Marketing</option><option>Payroll</option></select></label><label>Amount<input name="amount" type="number" min="0" step="0.01" placeholder="0.00" required /></label></div><div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowExpenseForm(false)}>Cancel</button><button className="button primary">Save expense</button></div></form></div>}
     {showItemForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowItemForm(false)}><form className="modal" onSubmit={addItem}><div className="modal-header"><div><h2>Add inventory item</h2><p>Keep your catalog up to date.</p></div><button type="button" className="close-button" onClick={() => setShowItemForm(false)} aria-label="Close"><X size={18} /></button></div><label>Product name<input name="name" placeholder="e.g. Espresso beans" required /></label><div className="form-row"><label>SKU<input name="sku" placeholder="COF-024" required /></label><label>Category<input name="category" placeholder="Coffee" required /></label></div><div className="form-row"><label>Units in stock<input name="stock" type="number" min="0" placeholder="0" required /></label><label>Reorder point<input name="reorderAt" type="number" min="0" placeholder="10" required /></label></div><label>Inventory value<input name="value" type="number" min="0" step="0.01" placeholder="0.00" required /></label><div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowItemForm(false)}>Cancel</button><button className="button primary">Save item</button></div></form></div>}
