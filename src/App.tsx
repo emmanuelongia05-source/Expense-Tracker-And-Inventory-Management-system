@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes, CalendarDays, Car, ChevronDown, CircleDollarSign, Dumbbell, Eye, EyeOff, GraduationCap, HeartPulse, Home, LayoutDashboard, LogIn, Moon, MoreHorizontal, PackagePlus, Plus, Receipt, Search, Settings, ShoppingCart, Sparkles, Store, Sun, Ticket, Utensils, Wallet, X } from 'lucide-react'
 import './App.css'
 import './Workspace.css'
+import './AuthLayout.css'
 
 type Expense = { id: number; description: string; category: string; date: string; amount: number; color: string }
 type InventoryItem = { id: number; name: string; sku: string; category: string; stock: number; reorderAt: number; value: number; status: 'In stock' | 'Low stock' | 'Out of stock' }

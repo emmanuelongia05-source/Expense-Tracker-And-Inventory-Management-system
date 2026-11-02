@@ -1,0 +1,211 @@
+.auth-reference {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-reference-side {
+  min-height: 282px;
+  flex: none;
+  gap: 18px;
+  padding: 14px clamp(24px, 4vw, 34px) 35px;
+  background:
+    radial-gradient(65% 65% at 90% 100%, #2f80d766, transparent 72%),
+    linear-gradient(145deg, #071833 0%, #0c2b5b 57%, #17458f 100%);
+}
+
+.ref-brand {
+  gap: 14px;
+  font-size: 32px;
+  letter-spacing: -0.8px;
+}
+
+.ref-brand-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+}
+
+.ref-brand-icon svg {
+  width: 30px;
+  height: 30px;
+}
+
+.ref-intro h1 {
+  max-width: 24ch;
+  margin: 17px 0 12px;
+  font-size: clamp(30px, 4.5vw, 40px);
+  line-height: 1.08;
+  letter-spacing: -1.6px;
+}
+
+.ref-intro p {
+  max-width: 44ch;
+  color: #d7e3f7;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.ref-benefits {
+  display: none;
+}
+
+.auth-reference-main {
+  flex: 1;
+  min-height: calc(100vh - 282px);
+  align-items: flex-start;
+  padding: 60px 24px 48px;
+  background: #f1f5ff;
+}
+
+.auth-reference.dark .auth-reference-main {
+  background: #080f1d;
+}
+
+.ref-form-wrap {
+  max-width: 642px;
+}
+
+.ref-form-wrap > h2 {
+  margin-bottom: 4px;
+  font-size: 50px;
+  letter-spacing: -1.8px;
+}
+
+.ref-subtitle {
+  margin-bottom: 42px;
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.ref-theme-toggle {
+  top: 22px;
+  right: 22px;
+  height: 52px;
+  gap: 10px;
+  padding: 0 20px;
+  font-size: 16px;
+}
+
+.ref-field {
+  margin-bottom: 33px;
+}
+
+.ref-field > label {
+  margin-bottom: 5px;
+  font-size: 18px;
+}
+
+.ref-field:has(.ref-password) > label {
+  margin-bottom: 3px;
+}
+
+.ref-field > input,
+.ref-password input {
+  height: 72px;
+  padding: 0 20px;
+  border-width: 2px;
+  border-radius: 15px;
+  font-size: 18px;
+}
+
+.ref-password input {
+  padding-right: 56px;
+}
+
+.ref-password > button {
+  right: 14px;
+}
+
+.ref-options {
+  margin: 0 0 24px;
+  font-size: 15px;
+}
+
+.ref-submit {
+  height: 58px;
+  font-size: 16px;
+}
+
+.ref-google {
+  height: 54px;
+  font-size: 15px;
+}
+
+@media (max-width: 700px) {
+  .auth-reference-side {
+    min-height: 0;
+    gap: 16px;
+    padding: 16px 22px 30px;
+  }
+
+  .ref-brand {
+    gap: 12px;
+    font-size: 28px;
+  }
+
+  .ref-brand-icon {
+    width: 46px;
+    height: 46px;
+  }
+
+  .ref-intro h1 {
+    font-size: clamp(28px, 6vw, 36px);
+  }
+
+  .ref-intro p {
+    font-size: 15px;
+  }
+
+  .auth-reference-main {
+    min-height: 0;
+    flex-direction: column;
+    padding: 22px 22px 40px;
+  }
+
+  .ref-theme-toggle {
+    position: static;
+    align-self: flex-end;
+    margin: 0 0 18px;
+  }
+
+  .ref-form-wrap {
+    max-width: 642px;
+    margin: 0 auto;
+  }
+
+  .ref-form-wrap > h2 {
+    font-size: clamp(34px, 8vw, 44px);
+  }
+
+  .ref-subtitle {
+    margin-bottom: 30px;
+    font-size: 17px;
+  }
+
+  .ref-field > input,
+  .ref-password input {
+    height: 64px;
+  }
+}
+
+@media (max-width: 380px) {
+  .auth-reference-side {
+    padding-inline: 18px;
+  }
+
+  .auth-reference-main {
+    padding-inline: 18px;
+  }
+
+  .ref-field > input,
+  .ref-password input {
+    height: 58px;
+    font-size: 16px;
+  }
+
+  .ref-options {
+    align-items: flex-start;
+    font-size: 12px;
+  }
+}
