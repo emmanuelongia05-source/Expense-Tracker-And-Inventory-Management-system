@@ -27,7 +27,6 @@ type AuthUser = { username: string; email: string }
 function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user: AuthUser, remember: boolean) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [theme, setTheme] = useState<'light' | 'dark'>(() => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-  const [previewExpenses] = useState(initialExpenses.reduce((sum, expense) => sum + expense.amount, 0))
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -62,7 +61,6 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user
     <aside className="auth-reference-side">
       <div className="ref-brand"><span className="ref-brand-icon"><Boxes size={23} /></span><strong>Ledgerly</strong></div>
       <div className="ref-intro"><h1>Expense Tracker &amp;<br />Inventory Management</h1><p>Smarter control over your expenses, inventory and suppliers, all in one place.</p></div>
-      <section className="ref-board" aria-label="Sample workspace overview"><div className="ref-board-head"><div><strong>{money(previewExpenses)}</strong><span>Sample total expenses</span></div><div><strong>{initialInventory.reduce((sum, item) => sum + item.stock, 0).toLocaleString()}</strong><span>Units in inventory</span></div></div>{initialInventory.map((item) => { const color = item.status === 'In stock' ? '#4ade80' : item.status === 'Low stock' ? '#fbbf24' : '#fb7185'; const percent = Math.max(5, Math.min(100, Math.round((item.stock / Math.max(item.reorderAt * 2, 1)) * 100))); return <div className="ref-stock-row" key={item.id}><span>{item.name}</span><div className="ref-stock-bar"><i style={{ width: `${percent}%`, background: color }} /></div><b style={{ color }}>{item.status === 'Out of stock' ? 'Out' : item.status === 'Low stock' ? 'Low' : `${item.stock} left`}</b></div> })}<small className="ref-sample-caption">Illustrative preview · sample products</small></section>
       <div className="ref-benefits"><span>Track expenses</span><span>Manage inventory</span><span>Stock alerts</span><span>Reports</span></div>
     </aside>
     <section className="auth-reference-main">
