@@ -211,8 +211,13 @@
 @media (max-width: 480px) {
   .auth-reference-side {
     flex-direction: column;
+    align-items: stretch;
     gap: 16px;
     padding-inline: 18px;
+  }
+
+  .ref-brand {
+    align-self: flex-start;
   }
 
   .ref-intro {
@@ -222,10 +227,30 @@
 
   .ref-intro h1 {
     font-size: 30px;
+    text-align: left;
+  }
+
+  .ref-intro p {
+    text-align: left;
   }
 
   .auth-reference-main {
+    align-items: stretch;
     padding-inline: 18px;
+  }
+
+  .ref-theme-toggle {
+    align-self: flex-end;
+  }
+
+  .ref-form-wrap {
+    width: 100%;
+    margin-inline: auto;
+  }
+
+  .ref-form-wrap > h2,
+  .ref-subtitle {
+    text-align: left;
   }
 
   .ref-field > input,
