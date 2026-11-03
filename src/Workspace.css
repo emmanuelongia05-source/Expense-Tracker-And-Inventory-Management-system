@@ -177,6 +177,98 @@
   font-weight: 600;
 }
 
+.sales-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workspace-data-list {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.workspace-data-header,
+.workspace-data-row {
+  display: grid;
+  align-items: center;
+  gap: 14px;
+  min-width: 760px;
+  padding: 12px 8px;
+  border-bottom: 1px solid #f0f2ef;
+}
+
+.workspace-data-header {
+  color: #abb2ae;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.workspace-data-row {
+  color: #68756e;
+  font-size: 11px;
+}
+
+.workspace-data-row > strong {
+  color: #34433b;
+}
+
+.sales-data-row {
+  grid-template-columns: minmax(180px, 1.6fr) minmax(120px, 1fr) 48px minmax(105px, .9fr) minmax(100px, .8fr);
+}
+
+.supplier-data-row {
+  grid-template-columns: minmax(140px, 1.2fr) minmax(115px, 1fr) minmax(160px, 1.25fr) minmax(110px, .9fr) minmax(140px, 1.1fr) 28px;
+  min-width: 900px;
+}
+
+.workspace-primary-cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workspace-primary-cell strong {
+  overflow: hidden;
+  color: #34433b;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-primary-cell small {
+  color: #98a19c;
+  font-size: 9px;
+}
+
+.supplier-remove {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #9aa39e;
+}
+
+.supplier-remove:hover {
+  background: #fbe9e7;
+  color: #c6655d;
+}
+
+.optional-label,
+.form-hint {
+  color: #98a19c;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.form-hint {
+  margin: 0;
+}
+
 @media (max-width: 700px) {
   .page-view-heading {
     align-items: flex-start;
@@ -193,5 +285,9 @@
 
   .workspace-inventory .stock-count {
     font-size: 9px;
+  }
+
+  .sales-metrics {
+    grid-template-columns: 1fr;
   }
 }

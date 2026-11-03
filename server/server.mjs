@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import { promises as fs } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MongoClient } from 'mongodb'
@@ -62,11 +63,30 @@ function requireAuth(request, response, next) {
 }
 
 async function readData(userId) {
-  const [expenses, inventory] = await Promise.all([
+  const [expenses, inventory, sales, suppliers] = await Promise.all([
     database.collection('expenses').find({ userId }, { projection: { _id: 0, userId: 0 } }).sort({ id: -1 }).toArray(),
     database.collection('inventory').find({ userId }, { projection: { _id: 0, userId: 0 } }).sort({ id: 1 }).toArray(),
+    database.collection('sales').find({ userId }, { projection: { _id: 0, userId: 0 } }).sort({ date: -1 }).toArray(),
+    database.collection('suppliers').find({ userId }, { projection: { _id: 0, userId: 0 } }).sort({ name: 1 }).toArray(),
   ])
-  return { expenses, inventory }
+  return { expenses, inventory, sales, suppliers }
+}
+
+function inventorySkuPrefix(name) {
+  const words = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').match(/[a-z0-9]+/gi) || []
+  return (words[0]?.slice(0, 3) || 'SKU').toUpperCase().padEnd(3, 'X')
+}
+
+async function generateInventorySku(userId, name) {
+  const prefix = inventorySkuPrefix(name)
+  const existingSkus = await database.collection('inventory').distinct('sku', {
+    userId,
+    sku: { $regex: `^${prefix}-[0-9]+$`, $options: 'i' },
+  })
+  const usedNumbers = new Set(existingSkus.map((sku) => Number(sku.slice(prefix.length + 1))))
+  let sequence = 1
+  while (usedNumbers.has(sequence)) sequence += 1
+  return `${prefix}-${String(sequence).padStart(3, '0')}`
 }
 
 function buildInsights(data) {
@@ -147,11 +167,131 @@ app.post('/api/expenses', requireAuth, async (request, response) => {
   response.status(201).json(expense)
 })
 app.post('/api/inventory', requireAuth, async (request, response) => {
-  const stock = Number(request.body.stock) || 0
-  const reorderAt = Number(request.body.reorderAt) || 0
-  const item = { id: Date.now(), userId: request.user.sub, ...request.body, stock, reorderAt, value: Number(request.body.value) || 0, status: stock === 0 ? 'Out of stock' : stock <= reorderAt ? 'Low stock' : 'In stock' }
-  await database.collection('inventory').insertOne(item)
-  response.status(201).json(item)
+  const name = String(request.body.name || '').trim()
+  const category = String(request.body.category || '').trim()
+  const stock = Number(request.body.stock)
+  const reorderAt = Number(request.body.reorderAt)
+  const value = Number(request.body.value)
+  if (!name || name.length > 120 || !category || category.length > 80 || !Number.isSafeInteger(stock) || stock < 0 || !Number.isSafeInteger(reorderAt) || reorderAt < 0 || !Number.isFinite(value) || value < 0) {
+    return response.status(400).json({ error: 'Enter a product name, category, non-negative whole-number stock and reorder point, and a valid inventory value.' })
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const sku = await generateInventorySku(request.user.sub, name)
+    const item = {
+      id: Date.now(),
+      userId: request.user.sub,
+      name,
+      sku,
+      category,
+      stock,
+      reorderAt,
+      value,
+      status: stock === 0 ? 'Out of stock' : stock <= reorderAt ? 'Low stock' : 'In stock',
+    }
+    try {
+      await database.collection('inventory').insertOne(item)
+      return response.status(201).json({
+        id: item.id,
+        name: item.name,
+        sku: item.sku,
+        category: item.category,
+        stock: item.stock,
+        reorderAt: item.reorderAt,
+        value: item.value,
+        status: item.status,
+      })
+    } catch (error) {
+      if (error.code !== 11000) throw error
+    }
+  }
+  return response.status(409).json({ error: 'Unable to generate a unique SKU. Please try again.' })
+})
+app.post('/api/sales', requireAuth, async (request, response) => {
+  const productId = Number(request.body.productId)
+  const quantity = Number(request.body.quantity)
+  const unitPrice = Number(request.body.unitPrice)
+  const customerName = String(request.body.customerName || '').trim().slice(0, 120)
+  const total = quantity * unitPrice
+  if (!Number.isSafeInteger(productId) || !Number.isSafeInteger(quantity) || quantity < 1 || !Number.isFinite(unitPrice) || unitPrice <= 0 || !Number.isFinite(total) || total > Number.MAX_SAFE_INTEGER) {
+    return response.status(400).json({ error: 'Choose a product, enter a positive whole-number quantity, and enter a price greater than zero.' })
+  }
+
+  const userId = request.user.sub
+  const product = await database.collection('inventory').findOne({ id: productId, userId })
+  if (!product) return response.status(404).json({ error: 'Inventory item not found.' })
+  if (product.stock < quantity) return response.status(409).json({ error: `Only ${product.stock} units of ${product.name} are in stock.` })
+
+  const sale = {
+    id: randomUUID(),
+    userId,
+    productId,
+    productName: product.name,
+    sku: product.sku,
+    quantity,
+    unitPrice,
+    total: Math.round(total * 100) / 100,
+    customerName,
+    date: new Date().toISOString(),
+  }
+  await database.collection('sales').insertOne(sale)
+
+  let updatedInventory
+  const remainingStock = { $subtract: ['$stock', quantity] }
+  const remainingValue = { $max: [0, { $subtract: ['$value', { $multiply: [{ $divide: ['$value', '$stock'] }, quantity] }] }] }
+  try {
+    updatedInventory = await database.collection('inventory').findOneAndUpdate(
+      { id: productId, userId, stock: { $gte: quantity } },
+      [{ $set: {
+        stock: remainingStock,
+        value: { $round: [remainingValue, 2] },
+        status: {
+          $switch: {
+            branches: [
+              { case: { $eq: [remainingStock, 0] }, then: 'Out of stock' },
+              { case: { $lte: [remainingStock, '$reorderAt'] }, then: 'Low stock' },
+            ],
+            default: 'In stock',
+          },
+        },
+      } }],
+      { returnDocument: 'after', projection: { _id: 0, userId: 0 } },
+    )
+  } catch (error) {
+    await database.collection('sales').deleteOne({ id: sale.id, userId }).catch((rollbackError) => {
+      console.error('Unable to roll back sale after inventory update failed:', rollbackError)
+    })
+    console.error('Unable to update inventory for sale:', error)
+    return response.status(500).json({ error: 'Unable to update inventory for this sale.' })
+  }
+
+  if (!updatedInventory) {
+    try {
+      await database.collection('sales').deleteOne({ id: sale.id, userId })
+    } catch (error) {
+      console.error('Unable to roll back sale after stock changed:', error)
+      return response.status(500).json({ error: 'Unable to confirm this sale. Refresh sales and inventory before retrying.' })
+    }
+    return response.status(409).json({ error: 'Stock changed before the sale could be recorded. Refresh and try again.' })
+  }
+  response.status(201).json({ sale: { ...sale, userId: undefined }, inventory: updatedInventory })
+})
+app.post('/api/suppliers', requireAuth, async (request, response) => {
+  const name = String(request.body.name || '').trim()
+  const contactPerson = String(request.body.contactPerson || '').trim()
+  const email = String(request.body.email || '').trim().toLowerCase()
+  const phone = String(request.body.phone || '').trim()
+  const address = String(request.body.address || '').trim()
+  if (!name || name.length > 120 || contactPerson.length > 120 || email.length > 254 || phone.length > 40 || address.length > 240) {
+    return response.status(400).json({ error: 'Enter a supplier name and keep contact details within the allowed lengths.' })
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return response.status(400).json({ error: 'Enter a valid supplier email address.' })
+  }
+
+  const supplier = { id: randomUUID(), userId: request.user.sub, name, contactPerson, email, phone, address }
+  await database.collection('suppliers').insertOne(supplier)
+  response.status(201).json({ id: supplier.id, name, contactPerson, email, phone, address })
 })
 app.delete('/api/expenses/:id', requireAuth, async (request, response) => {
   const result = await database.collection('expenses').deleteOne({ id: Number(request.params.id), userId: request.user.sub })
@@ -161,6 +301,11 @@ app.delete('/api/expenses/:id', requireAuth, async (request, response) => {
 app.delete('/api/inventory/:id', requireAuth, async (request, response) => {
   const result = await database.collection('inventory').deleteOne({ id: Number(request.params.id), userId: request.user.sub })
   if (!result.deletedCount) return response.status(404).json({ error: 'Inventory item not found' })
+  response.status(204).end()
+})
+app.delete('/api/suppliers/:id', requireAuth, async (request, response) => {
+  const result = await database.collection('suppliers').deleteOne({ id: request.params.id, userId: request.user.sub })
+  if (!result.deletedCount) return response.status(404).json({ error: 'Supplier not found.' })
   response.status(204).end()
 })
 app.post('/api/analysis', requireAuth, async (request, response) => {
@@ -195,6 +340,10 @@ async function connectDatabase() {
       connectedDatabase.collection('expenses').createIndex({ id: -1 }, { unique: true }),
       connectedDatabase.collection('inventory').createIndex({ userId: 1, sku: 1 }, { unique: true }),
       connectedDatabase.collection('inventory').createIndex({ stock: 1, reorderAt: 1 }),
+      connectedDatabase.collection('sales').createIndex({ userId: 1, date: -1 }),
+      connectedDatabase.collection('sales').createIndex({ userId: 1, id: 1 }, { unique: true }),
+      connectedDatabase.collection('suppliers').createIndex({ userId: 1, name: 1 }),
+      connectedDatabase.collection('suppliers').createIndex({ userId: 1, id: 1 }, { unique: true }),
     ])
     mongoClient = client
     database = connectedDatabase

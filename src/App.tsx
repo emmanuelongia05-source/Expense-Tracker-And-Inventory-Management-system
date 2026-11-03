@@ -7,6 +7,8 @@ import './AuthLayout.css'
 
 type Expense = { id: number; description: string; category: string; date: string; amount: number; color: string }
 type InventoryItem = { id: number; name: string; sku: string; category: string; stock: number; reorderAt: number; value: number; status: 'In stock' | 'Low stock' | 'Out of stock' }
+type Sale = { id: string; productId: number; productName: string; sku: string; quantity: number; unitPrice: number; total: number; customerName: string; date: string }
+type Supplier = { id: string; name: string; contactPerson: string; email: string; phone: string; address: string }
 const initialExpenses: Expense[] = [
   { id: 1, description: 'Wholesale coffee beans', category: 'Inventory', date: 'Today, 09:42', amount: 1840, color: 'mint' },
   { id: 2, description: 'Shop rent - September', category: 'Operations', date: 'Sep 16, 2024', amount: 2200, color: 'lavender' },
@@ -23,6 +25,10 @@ const navItems = [{ label: 'Overview', icon: LayoutDashboard }, { label: 'Expens
 const expenseCategories = [{ name: 'Fixed expenses', icon: Home, color: 'sage' }, { name: 'Shopping', icon: Store, color: 'apricot' }, { name: 'Food', icon: Utensils, color: 'rose' }, { name: 'Medical', icon: HeartPulse, color: 'pink' }, { name: 'Transportation', icon: Car, color: 'lilac' }, { name: 'Fitness', icon: Dumbbell, color: 'blue' }, { name: 'Entertainment', icon: Ticket, color: 'teal' }, { name: 'Family & education', icon: GraduationCap, color: 'olive' }]
 const money = (value: number) => `UGX ${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 const timeGreeting = (date: Date) => { const hour = date.getHours(); return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening' }
+const skuPrefix = (name: string) => {
+  const words = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').match(/[a-z0-9]+/gi) || []
+  return (words[0]?.slice(0, 3) || 'SKU').toUpperCase().padEnd(3, 'X')
+}
 type Insight = { type: string; title: string; detail: string }
 type AuthUser = { username: string; email: string }
 
@@ -91,15 +97,25 @@ function App() {
   const [activeNav, setActiveNav] = useState('Overview')
   const [expenses, setExpenses] = useState(initialExpenses)
   const [inventory, setInventory] = useState(initialInventory)
+  const [sales, setSales] = useState<Sale[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [search, setSearch] = useState('')
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [showItemForm, setShowItemForm] = useState(false)
+  const [itemName, setItemName] = useState('')
+  const [showSaleForm, setShowSaleForm] = useState(false)
+  const [showSupplierForm, setShowSupplierForm] = useState(false)
+  const [saleProductId, setSaleProductId] = useState('')
   const [toast, setToast] = useState('')
   const [insights, setInsights] = useState<{ summary: string; insights: Insight[]; provider?: string } | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const filteredInventory = useMemo(() => inventory.filter((item) => `${item.name} ${item.sku} ${item.category}`.toLowerCase().includes(search.toLowerCase())), [inventory, search])
   const filteredExpenses = useMemo(() => expenses.filter((expense) => `${expense.description} ${expense.category} ${expense.date}`.toLowerCase().includes(search.toLowerCase())), [expenses, search])
+  const filteredSales = useMemo(() => sales.filter((sale) => `${sale.productName} ${sale.sku} ${sale.customerName} ${sale.date}`.toLowerCase().includes(search.toLowerCase())), [sales, search])
+  const filteredSuppliers = useMemo(() => suppliers.filter((supplier) => `${supplier.name} ${supplier.contactPerson} ${supplier.email} ${supplier.phone} ${supplier.address}`.toLowerCase().includes(search.toLowerCase())), [suppliers, search])
   const totalExpenses = useMemo(() => expenses.reduce((total, expense) => total + expense.amount, 0), [expenses])
+  const totalSales = useMemo(() => sales.reduce((total, sale) => total + sale.total, 0), [sales])
+  const unitsSold = useMemo(() => sales.reduce((total, sale) => total + sale.quantity, 0), [sales])
   const inventoryValue = useMemo(() => inventory.reduce((total, item) => total + item.value, 0), [inventory])
   const stockAlerts = useMemo(() => inventory.filter((item) => item.status !== 'In stock').length, [inventory])
   const categoryTotals = useMemo(() => expenses.reduce<Record<string, number>>((totals, expense) => { totals[expense.category] = (totals[expense.category] || 0) + expense.amount; return totals }, {}), [expenses])
@@ -107,23 +123,127 @@ function App() {
   const lowStockCount = useMemo(() => inventory.filter((item) => item.stock > 0 && item.stock <= item.reorderAt).length, [inventory])
   const inventoryHealth = inventory.length ? Math.round((inventory.filter((item) => item.status === 'In stock').length / inventory.length) * 100) : 0
   const categoryBreakdown = useMemo(() => Object.entries(categoryTotals).sort(([, a], [, b]) => b - a).map(([name, amount]) => ({ name, amount, percent: totalExpenses ? Math.round((amount / totalExpenses) * 100) : 0 })), [categoryTotals, totalExpenses])
+  const availableProducts = useMemo(() => inventory.filter((item) => item.stock > 0), [inventory])
+  const selectedSaleProduct = availableProducts.find((item) => String(item.id) === saleProductId)
+  const generatedSku = useMemo(() => {
+    const prefix = skuPrefix(itemName)
+    const usedNumbers = new Set(inventory.flatMap((item) => {
+      const suffix = item.sku.startsWith(`${prefix}-`) ? item.sku.slice(prefix.length + 1) : ''
+      return /^\d+$/.test(suffix) ? [Number(suffix)] : []
+    }))
+    let sequence = 1
+    while (usedNumbers.has(sequence)) sequence += 1
+    return `${prefix}-${String(sequence).padStart(3, '0')}`
+  }, [inventory, itemName])
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3000) }
   const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
   useEffect(() => { const clock = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(clock) }, [])
-  useEffect(() => { if (!token) return; fetch('/api/data', { headers: { Authorization: `Bearer ${token}` } }).then((response) => response.ok ? response.json() : Promise.reject(new Error('Your session has expired'))).then((data) => { setExpenses(data.expenses.map((expense: Expense) => ({ ...expense, color: expense.color || 'peach' }))); setInventory(data.inventory) }).catch(() => { localStorage.removeItem('ledgerly_token'); localStorage.removeItem('ledgerly_user'); setToken(''); setCurrentUser(null) }) }, [token])
+  useEffect(() => { if (!token) return; fetch('/api/data', { headers: { Authorization: `Bearer ${token}` } }).then((response) => response.ok ? response.json() : Promise.reject(new Error('Your session has expired'))).then((data) => { setExpenses(data.expenses.map((expense: Expense) => ({ ...expense, color: expense.color || 'peach' }))); setInventory(data.inventory); setSales(data.sales || []); setSuppliers(data.suppliers || []) }).catch(() => { localStorage.removeItem('ledgerly_token'); localStorage.removeItem('ledgerly_user'); setToken(''); setCurrentUser(null) }) }, [token])
   const handleAuthenticated = (newToken: string, user: AuthUser, remember: boolean) => { localStorage.removeItem('ledgerly_token'); localStorage.removeItem('ledgerly_user'); sessionStorage.removeItem('ledgerly_token'); sessionStorage.removeItem('ledgerly_user'); const storage = remember ? localStorage : sessionStorage; storage.setItem('ledgerly_token', newToken); storage.setItem('ledgerly_user', JSON.stringify(user)); setToken(newToken); setCurrentUser(user) }
   const logout = () => { localStorage.removeItem('ledgerly_token'); localStorage.removeItem('ledgerly_user'); sessionStorage.removeItem('ledgerly_token'); sessionStorage.removeItem('ledgerly_user'); setToken(''); setCurrentUser(null); setInsights(null) }
   const runAnalysis = () => { setAnalysisLoading(true); fetch('/api/analysis', { method: 'POST', headers: authHeaders, body: JSON.stringify({ expenses, inventory }) }).then((response) => response.json()).then(setInsights).catch(() => notify('Unable to run analysis')).finally(() => setAnalysisLoading(false)) }
   const addExpense = (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); const expense = { description: String(data.get('description') || 'New expense'), category: String(data.get('category') || 'Operations'), amount: Number(data.get('amount')) || 0 }; setExpenses((current) => [{ id: Date.now(), ...expense, date: 'Just now', color: 'peach' }, ...current]); fetch('/api/expenses', { method: 'POST', headers: authHeaders, body: JSON.stringify(expense) }).catch(() => undefined); setShowExpenseForm(false); notify('Expense added to your ledger') }
-  const addItem = (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); const item = { name: String(data.get('name') || 'New item'), sku: String(data.get('sku') || 'NEW-001'), category: String(data.get('category') || 'Other'), stock: Number(data.get('stock')) || 0, reorderAt: Number(data.get('reorderAt')) || 0, value: Number(data.get('value')) || 0 }; const status = item.stock === 0 ? 'Out of stock' : item.stock <= item.reorderAt ? 'Low stock' : 'In stock'; setInventory((current) => [...current, { id: Date.now(), ...item, status }]); fetch('/api/inventory', { method: 'POST', headers: authHeaders, body: JSON.stringify(item) }).catch(() => undefined); setShowItemForm(false); notify('Inventory item added') }
+  const addItem = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    const item = {
+      name: itemName.trim(),
+      sku: generatedSku,
+      category: String(data.get('category') || 'Other'),
+      stock: Number(data.get('stock')),
+      reorderAt: Number(data.get('reorderAt')),
+      value: Number(data.get('value')),
+    }
+
+    try {
+      const response = await fetch('/api/inventory', { method: 'POST', headers: authHeaders, body: JSON.stringify(item) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Unable to add inventory item')
+      setInventory((current) => [...current, result])
+      setShowItemForm(false)
+      setItemName('')
+      notify(`Inventory item added · SKU ${result.sku}`)
+    } catch (itemError) {
+      notify(itemError instanceof Error ? itemError.message : 'Unable to add inventory item')
+    }
+  }
+  const openItemForm = () => {
+    setItemName('')
+    setShowItemForm(true)
+  }
+  const closeItemForm = () => {
+    setShowItemForm(false)
+    setItemName('')
+  }
+  const addSale = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    const sale = {
+      productId: Number(data.get('productId')),
+      quantity: Number(data.get('quantity')),
+      unitPrice: Number(data.get('unitPrice')),
+      customerName: String(data.get('customerName') || '').trim(),
+    }
+
+    try {
+      const response = await fetch('/api/sales', { method: 'POST', headers: authHeaders, body: JSON.stringify(sale) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Unable to record sale')
+      setSales((current) => [result.sale, ...current])
+      setInventory((current) => current.map((item) => item.id === result.inventory.id ? result.inventory : item))
+      setShowSaleForm(false)
+      setSaleProductId('')
+      notify('Sale recorded and inventory updated')
+    } catch (saleError) {
+      notify(saleError instanceof Error ? saleError.message : 'Unable to record sale')
+    }
+  }
+
+  const addSupplier = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    const supplier = {
+      name: String(data.get('name') || '').trim(),
+      contactPerson: String(data.get('contactPerson') || '').trim(),
+      email: String(data.get('email') || '').trim(),
+      phone: String(data.get('phone') || '').trim(),
+      address: String(data.get('address') || '').trim(),
+    }
+
+    try {
+      const response = await fetch('/api/suppliers', { method: 'POST', headers: authHeaders, body: JSON.stringify(supplier) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Unable to add supplier')
+      setSuppliers((current) => [result, ...current])
+      setShowSupplierForm(false)
+      notify('Supplier added')
+    } catch (supplierError) {
+      notify(supplierError instanceof Error ? supplierError.message : 'Unable to add supplier')
+    }
+  }
+
+  const deleteSupplier = async (supplier: Supplier) => {
+    try {
+      const response = await fetch(`/api/suppliers/${encodeURIComponent(supplier.id)}`, { method: 'DELETE', headers: authHeaders })
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(result.error || 'Unable to remove supplier')
+      }
+      setSuppliers((current) => current.filter((item) => item.id !== supplier.id))
+      notify('Supplier removed')
+    } catch (supplierError) {
+      notify(supplierError instanceof Error ? supplierError.message : 'Unable to remove supplier')
+    }
+  }
+
   const renderWorkspacePage = () => {
     const descriptions: Record<string, string> = {
       Expenses: 'Review and record your business spending.',
       Inventory: 'Track stock levels, product value, and items to reorder.',
-      Sales: 'Sales records are not yet available in this workspace.',
+      Sales: 'Record sales, track revenue, and keep stock levels up to date.',
       Reports: 'Review spending patterns and business health.',
       Categories: 'See how your expenses are distributed by category.',
-      Suppliers: 'Supplier records are not yet available in this workspace.',
+      Suppliers: 'Keep your supplier contacts organized in one place.',
       Settings: 'Manage your signed-in workspace account.',
     }
 
@@ -136,8 +256,10 @@ function App() {
         </div>
         <div className="heading-actions">
           {activeNav === 'Expenses' && <button className="button primary" onClick={() => setShowExpenseForm(true)}><Plus size={17} /> Add expense</button>}
-          {activeNav === 'Inventory' && <button className="button primary" onClick={() => setShowItemForm(true)}><PackagePlus size={17} /> Add inventory</button>}
+          {activeNav === 'Inventory' && <button className="button primary" onClick={openItemForm}><PackagePlus size={17} /> Add inventory</button>}
           {activeNav === 'Categories' && <button className="button primary" onClick={() => setShowExpenseForm(true)}><Plus size={17} /> Add expense</button>}
+          {activeNav === 'Sales' && <button className="button primary" onClick={() => { setSaleProductId(String(availableProducts[0]?.id || '')); setShowSaleForm(true) }} disabled={!availableProducts.length}><Plus size={17} /> Record sale</button>}
+          {activeNav === 'Suppliers' && <button className="button primary" onClick={() => setShowSupplierForm(true)}><Plus size={17} /> Add supplier</button>}
         </div>
       </header>
 
@@ -195,11 +317,40 @@ function App() {
         </div>
       </section>}
 
-      {(activeNav === 'Sales' || activeNav === 'Suppliers') && <section className="panel workspace-panel workspace-empty">
-        <ShoppingCart size={28} />
-        <strong>{activeNav} tracking is not configured yet</strong>
-        <span>This workspace currently tracks expenses and inventory. No {activeNav.toLowerCase()} records are available to display.</span>
-        <button className="button secondary" onClick={() => setActiveNav('Inventory')}>Open inventory</button>
+      {activeNav === 'Sales' && <>
+        <section className="metric-grid sales-metrics" aria-label="Sales summary">
+          <article className="metric-card"><div className="metric-top"><span>Total revenue</span><span className="metric-icon green"><CircleDollarSign size={17} /></span></div><strong>{money(totalSales)}</strong><div className="metric-trend neutral">{sales.length} recorded sales</div></article>
+          <article className="metric-card"><div className="metric-top"><span>Units sold</span><span className="metric-icon blue"><Boxes size={17} /></span></div><strong>{unitsSold.toLocaleString()}</strong><div className="metric-trend neutral">Across all products</div></article>
+          <article className="metric-card"><div className="metric-top"><span>Products available</span><span className="metric-icon yellow"><ShoppingCart size={17} /></span></div><strong>{availableProducts.length}</strong><div className="metric-trend neutral">Ready to sell</div></article>
+        </section>
+        <section className="panel workspace-panel">
+          <div className="panel-heading"><div><h2>Sales history</h2><p>{filteredSales.length} matching sales · Revenue {money(totalSales)}</p></div></div>
+          {filteredSales.length ? <div className="workspace-data-list sales-list">
+            <div className="workspace-data-header sales-data-row"><span>Product</span><span>Customer</span><span>Qty</span><span>Total</span><span>Date</span></div>
+            {filteredSales.map((sale) => <div className="workspace-data-row sales-data-row" key={sale.id}>
+              <span className="workspace-primary-cell"><strong>{sale.productName}</strong><small>{sale.sku} · {money(sale.unitPrice)} each</small></span>
+              <span>{sale.customerName || 'Walk-in customer'}</span>
+              <span>{sale.quantity}</span>
+              <strong>{money(sale.total)}</strong>
+              <span>{new Date(sale.date).toLocaleDateString()}</span>
+            </div>)}
+          </div> : <div className="workspace-empty sales-empty"><ShoppingCart size={25} /><strong>{search ? 'No matching sales' : 'No sales recorded yet'}</strong><span>{search ? 'Try another search.' : availableProducts.length ? 'Record your first sale to track revenue and update stock.' : 'Add inventory with available stock before recording a sale.'}</span>{availableProducts.length > 0 && <button className="button primary" onClick={() => { setSaleProductId(String(availableProducts[0].id)); setShowSaleForm(true) }}><Plus size={16} /> Record sale</button>}</div>}
+        </section>
+      </>}
+
+      {activeNav === 'Suppliers' && <section className="panel workspace-panel">
+        <div className="panel-heading"><div><h2>Supplier directory</h2><p>{filteredSuppliers.length} matching suppliers</p></div></div>
+        {filteredSuppliers.length ? <div className="workspace-data-list supplier-list">
+          <div className="workspace-data-header supplier-data-row"><span>Supplier</span><span>Contact person</span><span>Email</span><span>Phone</span><span>Address</span><span /></div>
+          {filteredSuppliers.map((supplier) => <div className="workspace-data-row supplier-data-row" key={supplier.id}>
+            <span className="workspace-primary-cell"><strong>{supplier.name}</strong></span>
+            <span>{supplier.contactPerson || '—'}</span>
+            <span>{supplier.email || '—'}</span>
+            <span>{supplier.phone || '—'}</span>
+            <span>{supplier.address || '—'}</span>
+            <button type="button" className="supplier-remove" aria-label={`Remove ${supplier.name}`} onClick={() => deleteSupplier(supplier)}><X size={16} /></button>
+          </div>)}
+        </div> : <div className="workspace-empty supplier-empty"><Store size={25} /><strong>{search ? 'No matching suppliers' : 'No suppliers added yet'}</strong><span>{search ? 'Try another search.' : 'Add supplier contact details to keep your business directory up to date.'}</span><button className="button primary" onClick={() => setShowSupplierForm(true)}><Plus size={16} /> Add supplier</button></div>}
       </section>}
 
       {activeNav === 'Settings' && <section className="panel workspace-panel settings-panel">
@@ -225,7 +376,9 @@ function App() {
       {activeNav !== 'Overview' && renderWorkspacePage()}
     </div></main>
     {showExpenseForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowExpenseForm(false)}><form className="modal" onSubmit={addExpense}><div className="modal-header"><div><h2>Add expense</h2><p>Record a new business expense.</p></div><button type="button" className="close-button" onClick={() => setShowExpenseForm(false)} aria-label="Close"><X size={18} /></button></div><label>Description<input name="description" placeholder="e.g. Delivery supplies" required /></label><div className="form-row"><label>Category<select name="category"><option>Fixed expenses</option><option>Shopping</option><option>Food</option><option>Medical</option><option>Transportation</option><option>Fitness</option><option>Entertainment</option><option>Family & education</option><option>Operations</option><option>Inventory</option><option>Marketing</option><option>Payroll</option></select></label><label>Amount<input name="amount" type="number" min="0" step="0.01" placeholder="0.00" required /></label></div><div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowExpenseForm(false)}>Cancel</button><button className="button primary">Save expense</button></div></form></div>}
-    {showItemForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowItemForm(false)}><form className="modal" onSubmit={addItem}><div className="modal-header"><div><h2>Add inventory item</h2><p>Keep your catalog up to date.</p></div><button type="button" className="close-button" onClick={() => setShowItemForm(false)} aria-label="Close"><X size={18} /></button></div><label>Product name<input name="name" placeholder="e.g. Espresso beans" required /></label><div className="form-row"><label>SKU<input name="sku" placeholder="COF-024" required /></label><label>Category<input name="category" placeholder="Coffee" required /></label></div><div className="form-row"><label>Units in stock<input name="stock" type="number" min="0" placeholder="0" required /></label><label>Reorder point<input name="reorderAt" type="number" min="0" placeholder="10" required /></label></div><label>Inventory value<input name="value" type="number" min="0" step="0.01" placeholder="0.00" required /></label><div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowItemForm(false)}>Cancel</button><button className="button primary">Save item</button></div></form></div>}
+    {showItemForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && closeItemForm()}><form className="modal" onSubmit={addItem}><div className="modal-header"><div><h2>Add inventory item</h2><p>Keep your catalog up to date.</p></div><button type="button" className="close-button" onClick={closeItemForm} aria-label="Close"><X size={18} /></button></div><label>Product name<input name="name" value={itemName} onChange={(event) => setItemName(event.target.value)} placeholder="e.g. Espresso beans" required /></label><div className="form-row"><label>SKU <span className="optional-label">Auto-generated</span><input name="sku" value={generatedSku} readOnly aria-readonly="true" /></label><label>Category<input name="category" placeholder="Coffee" required /></label></div><div className="form-row"><label>Units in stock<input name="stock" type="number" min="0" placeholder="0" required /></label><label>Reorder point<input name="reorderAt" type="number" min="0" placeholder="10" required /></label></div><label>Inventory value<input name="value" type="number" min="0" step="0.01" placeholder="0.00" required /></label><div className="modal-actions"><button type="button" className="button secondary" onClick={closeItemForm}>Cancel</button><button className="button primary">Save item</button></div></form></div>}
+    {showSaleForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowSaleForm(false)}><form className="modal" onSubmit={addSale}><div className="modal-header"><div><h2>Record sale</h2><p>Record revenue and deduct sold units from inventory.</p></div><button type="button" className="close-button" onClick={() => setShowSaleForm(false)} aria-label="Close"><X size={18} /></button></div><label>Product<select name="productId" value={saleProductId} onChange={(event) => setSaleProductId(event.target.value)} required>{availableProducts.map((item) => <option value={item.id} key={item.id}>{item.name} · {item.stock} in stock</option>)}</select></label><div className="form-row"><label>Quantity<input name="quantity" type="number" min="1" max={selectedSaleProduct?.stock || 1} step="1" placeholder="1" required /></label><label>Unit price<input name="unitPrice" type="number" min="0.01" step="0.01" placeholder="0.00" required /></label></div><label>Customer name <span className="optional-label">Optional</span><input name="customerName" maxLength={120} placeholder="Walk-in customer" /></label>{selectedSaleProduct && <p className="form-hint">{selectedSaleProduct.stock} units available. Stock will update when the sale is saved.</p>}<div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowSaleForm(false)}>Cancel</button><button className="button primary" disabled={!availableProducts.length}>Save sale</button></div></form></div>}
+    {showSupplierForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowSupplierForm(false)}><form className="modal" onSubmit={addSupplier}><div className="modal-header"><div><h2>Add supplier</h2><p>Save your supplier's contact details.</p></div><button type="button" className="close-button" onClick={() => setShowSupplierForm(false)} aria-label="Close"><X size={18} /></button></div><label>Supplier name<input name="name" maxLength={120} placeholder="e.g. Kampala Coffee Traders" required /></label><label>Contact person<input name="contactPerson" maxLength={120} placeholder="Contact name" /></label><div className="form-row"><label>Email<input name="email" type="email" maxLength={254} placeholder="supplier@business.com" /></label><label>Phone<input name="phone" type="tel" maxLength={40} placeholder="+256 ..." /></label></div><label>Address<input name="address" maxLength={240} placeholder="Supplier location" /></label><div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowSupplierForm(false)}>Cancel</button><button className="button primary">Save supplier</button></div></form></div>}
     {toast && <div className="toast"><span>✓</span>{toast}</div>}
   </div>
 }
