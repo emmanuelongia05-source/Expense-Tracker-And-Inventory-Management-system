@@ -27,7 +27,8 @@ const money = (value: number) => `UGX ${value.toLocaleString('en-US', { minimumF
 const timeGreeting = (date: Date) => { const hour = date.getHours(); return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening' }
 const skuPrefix = (name: string) => {
   const words = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').match(/[a-z0-9]+/gi) || []
-  return (words[0]?.slice(0, 3) || 'SKU').toUpperCase().padEnd(3, 'X')
+  const initials = words.length > 1 ? words.slice(0, 2).map((word) => word[0]).join('') : words[0]?.slice(0, 2)
+  return (initials || 'PR').toUpperCase().padEnd(2, 'X')
 }
 type Insight = { type: string; title: string; detail: string }
 type AuthUser = { username: string; email: string }

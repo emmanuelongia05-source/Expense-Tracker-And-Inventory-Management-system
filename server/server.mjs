@@ -74,7 +74,8 @@ async function readData(userId) {
 
 function inventorySkuPrefix(name) {
   const words = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').match(/[a-z0-9]+/gi) || []
-  return (words[0]?.slice(0, 3) || 'SKU').toUpperCase().padEnd(3, 'X')
+  const initials = words.length > 1 ? words.slice(0, 2).map((word) => word[0]).join('') : words[0]?.slice(0, 2)
+  return (initials || 'PR').toUpperCase().padEnd(2, 'X')
 }
 
 async function generateInventorySku(userId, name) {
