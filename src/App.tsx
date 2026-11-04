@@ -102,6 +102,7 @@ function App() {
   const [search, setSearch] = useState('')
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [showItemForm, setShowItemForm] = useState(false)
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [itemName, setItemName] = useState('')
   const [showSaleForm, setShowSaleForm] = useState(false)
   const [showSupplierForm, setShowSupplierForm] = useState(false)
@@ -156,6 +157,18 @@ function App() {
     }
 
     try {
+      if (editingItem) {
+        const response = await fetch(`/api/inventory/${editingItem.id}`, { method: 'PUT', headers: authHeaders, body: JSON.stringify(item) })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Unable to update inventory item')
+        setInventory((current) => current.map((entry) => entry.id === editingItem.id ? result : entry))
+        setShowItemForm(false)
+        setEditingItem(null)
+        setItemName('')
+        notify('Inventory item updated')
+        return
+      }
+
       const response = await fetch('/api/inventory', { method: 'POST', headers: authHeaders, body: JSON.stringify(item) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Unable to add inventory item')
@@ -168,11 +181,13 @@ function App() {
     }
   }
   const openItemForm = () => {
+    setEditingItem(null)
     setItemName('')
     setShowItemForm(true)
   }
   const closeItemForm = () => {
     setShowItemForm(false)
+    setEditingItem(null)
     setItemName('')
   }
   const addSale = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -279,7 +294,7 @@ function App() {
         <div className="inventory-table workspace-inventory">
           <div className="table-header"><span>Product</span><span>Stock</span><span>Value</span></div>
           {filteredInventory.length ? filteredInventory.map((item) => <div className="table-row" key={item.id}>
-            <div className="table-product"><span className="product-thumb"><Boxes size={16} /></span><span><strong>{item.name}</strong><small>{item.sku} · {item.category}</small></span></div>
+            <div className="table-product"><span className="product-thumb"><Boxes size={16} /></span><span><strong>{item.name}</strong><small>{item.sku} · {item.category}</small></span><button type="button" className="inventory-edit-button" aria-label={`Edit ${item.name} stock and details`} onClick={() => { setEditingItem(item); setItemName(item.name); setShowItemForm(true) }}>Edit stock</button></div>
             <span className={`stock-count ${item.status === 'Low stock' ? 'warning' : item.status === 'Out of stock' ? 'danger' : ''}`}>{item.stock} · {item.status}</span>
             <strong>{money(item.value)}</strong>
           </div>) : <div className="workspace-empty"><Boxes size={25} /><strong>No matching products</strong><span>Try another search or add an inventory item.</span></div>}
@@ -376,7 +391,7 @@ function App() {
       {activeNav !== 'Overview' && renderWorkspacePage()}
     </div></main>
     {showExpenseForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowExpenseForm(false)}><form className="modal" onSubmit={addExpense}><div className="modal-header"><div><h2>Add expense</h2><p>Record a new business expense.</p></div><button type="button" className="close-button" onClick={() => setShowExpenseForm(false)} aria-label="Close"><X size={18} /></button></div><label>Description<input name="description" placeholder="e.g. Delivery supplies" required /></label><div className="form-row"><label>Category<select name="category"><option>Fixed expenses</option><option>Shopping</option><option>Food</option><option>Medical</option><option>Transportation</option><option>Fitness</option><option>Entertainment</option><option>Family & education</option><option>Operations</option><option>Inventory</option><option>Marketing</option><option>Payroll</option></select></label><label>Amount<input name="amount" type="number" min="0" step="0.01" placeholder="0.00" required /></label></div><div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowExpenseForm(false)}>Cancel</button><button className="button primary">Save expense</button></div></form></div>}
-    {showItemForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && closeItemForm()}><form className="modal" onSubmit={addItem}><div className="modal-header"><div><h2>Add inventory item</h2><p>Keep your catalog up to date.</p></div><button type="button" className="close-button" onClick={closeItemForm} aria-label="Close"><X size={18} /></button></div><label>Product name<input name="name" value={itemName} onChange={(event) => setItemName(event.target.value)} placeholder="e.g. Espresso beans" required /></label><div className="form-row"><label>SKU <span className="optional-label">Auto-generated</span><input name="sku" value={generatedSku} readOnly aria-readonly="true" /></label><label>Category<input name="category" placeholder="Coffee" required /></label></div><div className="form-row"><label>Units in stock<input name="stock" type="number" min="0" placeholder="0" required /></label><label>Reorder point<input name="reorderAt" type="number" min="0" placeholder="10" required /></label></div><label>Inventory value<input name="value" type="number" min="0" step="0.01" placeholder="0.00" required /></label><div className="modal-actions"><button type="button" className="button secondary" onClick={closeItemForm}>Cancel</button><button className="button primary">Save item</button></div></form></div>}
+    {showItemForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && closeItemForm()}><form className="modal" onSubmit={addItem}><div className="modal-header"><div><h2>{editingItem ? 'Edit inventory item' : 'Add inventory item'}</h2><p>{editingItem ? 'Correct product details or stock levels.' : 'Keep your catalog up to date.'}</p></div><button type="button" className="close-button" onClick={closeItemForm} aria-label="Close"><X size={18} /></button></div><label>Product name<input name="name" value={itemName} onChange={(event) => setItemName(event.target.value)} placeholder="e.g. Espresso beans" required /></label><div className="form-row"><label>SKU <span className="optional-label">{editingItem ? 'Stable product code' : 'Auto-generated'}</span><input name="sku" value={editingItem?.sku || generatedSku} readOnly aria-readonly="true" /></label><label>Category<input name="category" defaultValue={editingItem?.category || ''} placeholder="Coffee" required /></label></div><div className="form-row"><label>Units in stock<input name="stock" type="number" min="0" defaultValue={editingItem?.stock} placeholder="0" required /></label><label>Reorder point<input name="reorderAt" type="number" min="0" defaultValue={editingItem?.reorderAt} placeholder="10" required /></label></div><label>Inventory value<input name="value" type="number" min="0" step="0.01" defaultValue={editingItem?.value} placeholder="0.00" required /></label><div className="modal-actions"><button type="button" className="button secondary" onClick={closeItemForm}>Cancel</button><button className="button primary">{editingItem ? 'Save changes' : 'Save item'}</button></div></form></div>}
     {showSaleForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowSaleForm(false)}><form className="modal" onSubmit={addSale}><div className="modal-header"><div><h2>Record sale</h2><p>Record revenue and deduct sold units from inventory.</p></div><button type="button" className="close-button" onClick={() => setShowSaleForm(false)} aria-label="Close"><X size={18} /></button></div><label>Product<select name="productId" value={saleProductId} onChange={(event) => setSaleProductId(event.target.value)} required>{availableProducts.map((item) => <option value={item.id} key={item.id}>{item.name} · {item.stock} in stock</option>)}</select></label><div className="form-row"><label>Quantity<input name="quantity" type="number" min="1" max={selectedSaleProduct?.stock || 1} step="1" placeholder="1" required /></label><label>Unit price<input name="unitPrice" type="number" min="0.01" step="0.01" placeholder="0.00" required /></label></div><label>Customer name <span className="optional-label">Optional</span><input name="customerName" maxLength={120} placeholder="Walk-in customer" /></label>{selectedSaleProduct && <p className="form-hint">{selectedSaleProduct.stock} units available. Stock will update when the sale is saved.</p>}<div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowSaleForm(false)}>Cancel</button><button className="button primary" disabled={!availableProducts.length}>Save sale</button></div></form></div>}
     {showSupplierForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowSupplierForm(false)}><form className="modal" onSubmit={addSupplier}><div className="modal-header"><div><h2>Add supplier</h2><p>Save your supplier's contact details.</p></div><button type="button" className="close-button" onClick={() => setShowSupplierForm(false)} aria-label="Close"><X size={18} /></button></div><label>Supplier name<input name="name" maxLength={120} placeholder="e.g. Kampala Coffee Traders" required /></label><label>Contact person<input name="contactPerson" maxLength={120} placeholder="Contact name" /></label><div className="form-row"><label>Email<input name="email" type="email" maxLength={254} placeholder="supplier@business.com" /></label><label>Phone<input name="phone" type="tel" maxLength={40} placeholder="+256 ..." /></label></div><label>Address<input name="address" maxLength={240} placeholder="Supplier location" /></label><div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowSupplierForm(false)}>Cancel</button><button className="button primary">Save supplier</button></div></form></div>}
     {toast && <div className="toast"><span>✓</span>{toast}</div>}

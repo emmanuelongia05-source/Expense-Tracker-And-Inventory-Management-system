@@ -207,6 +207,29 @@ app.post('/api/inventory', requireAuth, async (request, response) => {
   }
   return response.status(409).json({ error: 'Unable to generate a unique SKU. Please try again.' })
 })
+app.put('/api/inventory/:id', requireAuth, async (request, response) => {
+  const name = String(request.body.name || '').trim()
+  const category = String(request.body.category || '').trim()
+  const stock = Number(request.body.stock)
+  const reorderAt = Number(request.body.reorderAt)
+  const value = Number(request.body.value)
+  if (!name || name.length > 120 || !category || category.length > 80 || !Number.isSafeInteger(stock) || stock < 0 || !Number.isSafeInteger(reorderAt) || reorderAt < 0 || !Number.isFinite(value) || value < 0) {
+    return response.status(400).json({ error: 'Enter a product name, category, non-negative whole-number stock and reorder point, and a valid inventory value.' })
+  }
+  const filter = { id: Number(request.params.id), userId: request.user.sub }
+  const result = await database.collection('inventory').findOneAndUpdate(
+    filter,
+    { $set: { name, category, stock, reorderAt, value, status: stock === 0 ? 'Out of stock' : stock <= reorderAt ? 'Low stock' : 'In stock' } },
+    { returnDocument: 'after', projection: { _id: 0, userId: 0 } },
+  )
+  if (!result) return response.status(404).json({ error: 'Inventory item not found.' })
+  await database.collection('sales').updateMany(
+    { productId: result.id, userId: request.user.sub },
+    { $set: { productName: result.name, sku: result.sku } },
+  )
+  response.json(result)
+})
+
 app.post('/api/sales', requireAuth, async (request, response) => {
   const productId = Number(request.body.productId)
   const quantity = Number(request.body.quantity)
