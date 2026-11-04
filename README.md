@@ -47,11 +47,15 @@ The backend runs at `http://localhost:8787` and exposes:
 - `GET /api/data`
 - `POST /api/expenses`
 - `POST /api/inventory`
+- `POST /api/inventory/:id/restocks`
+- `GET /api/inventory/:id/restocks`
 - `DELETE /api/expenses/:id`
 - `DELETE /api/inventory/:id`
 - `POST /api/analysis`
 
-Expenses and inventory are persisted in MongoDB. `server/data.json` is used only as first-run demo seed data.
+Expenses, inventory, and restock history are persisted in MongoDB. `server/data.json` is used only as first-run demo seed data.
+
+On the Inventory page, use **Restock** on a product to record units received, per-unit cost, supplier, date, and an optional note. The server adds the received quantity and purchase cost to the item's existing stock and inventory value. Use **History** to review saved restock receipts for that product.
 
 ## AI analysis
 

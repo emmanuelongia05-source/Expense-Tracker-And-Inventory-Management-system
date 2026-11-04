@@ -49,6 +49,28 @@
   font-size: 10px;
 }
 
+
+.inventory-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-left: auto;
+}
+.inventory-actions .inventory-edit-button { display: inline-flex; align-items: center; gap: 4px; margin-left: 0; }
+.inventory-history-button { background: #fff; }
+.restock-form-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
+.restock-form-fields:disabled { opacity: .7; }
+.restock-form-fields .form-hint { margin: 0 0 14px; }
+.restock-history-modal { max-height: min(80vh, 680px); overflow: auto; }
+.restock-history-list { display: grid; max-height: 48vh; overflow: auto; }
+.restock-history-entry { display: grid; gap: 5px; padding: 12px 0; border-bottom: 1px solid #edf1ed; color: #68756e; font-size: 11px; }
+.restock-history-entry > div { display: flex; justify-content: space-between; gap: 10px; }
+.restock-history-entry strong { color: #347156; }
+.restock-history-entry time, .restock-history-entry small { color: #929d97; font-size: 10px; }
+.restock-history-empty { min-height: 150px; }
+
 .workspace-empty {
   min-height: 210px;
   display: flex;
@@ -300,6 +322,9 @@
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .inventory-actions .inventory-edit-button { padding: 6px; }
+  .inventory-actions .inventory-edit-button span { display: none; }
 
   .workspace-report-grid {
     grid-template-columns: 1fr;

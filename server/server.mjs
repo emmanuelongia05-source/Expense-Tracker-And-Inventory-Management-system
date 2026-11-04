@@ -231,6 +231,77 @@ app.put('/api/inventory/:id', requireAuth, async (request, response) => {
   response.json(result)
 })
 
+app.get('/api/inventory/:id/restocks', requireAuth, async (request, response) => {
+  const productId = Number(request.params.id)
+  const userId = request.user.sub
+  const product = await database.collection('inventory').findOne({ id: productId, userId }, { projection: { _id: 1 } })
+  if (!product) return response.status(404).json({ error: 'Inventory item not found.' })
+  const restocks = await database.collection('stockMovements').find(
+    { productId, userId, type: 'restock' }, { projection: { _id: 0, userId: 0 } },
+  ).sort({ receivedAt: -1, id: -1 }).toArray()
+  response.json(restocks)
+})
+app.post('/api/inventory/:id/restocks', requireAuth, async (request, response) => {
+  const productId = Number(request.params.id)
+  const quantity = Number(request.body.quantity)
+  const unitCost = Number(request.body.unitCost)
+  const receivedAt = String(request.body.receivedAt || '')
+  const supplierId = String(request.body.supplierId || '')
+  const note = String(request.body.note || '').trim()
+  const totalCost = Math.round(quantity * unitCost * 100) / 100
+  const receivedDate = new Date(`${receivedAt}T00:00:00.000Z`)
+  if (!Number.isSafeInteger(productId) || !Number.isSafeInteger(quantity) || quantity < 1 || !Number.isFinite(unitCost) || unitCost < 0 || !Number.isFinite(totalCost) || totalCost < 0 || totalCost > Number.MAX_SAFE_INTEGER || !/^\d{4}-\d{2}-\d{2}$/.test(receivedAt) || !Number.isFinite(receivedDate.getTime()) || receivedDate.toISOString().slice(0, 10) !== receivedAt || note.length > 300) {
+    return response.status(400).json({ error: 'Enter a positive whole-number quantity, valid unit cost and received date, and a note no longer than 300 characters.' })
+  }
+  const userId = request.user.sub
+  const product = await database.collection('inventory').findOne({ id: productId, userId })
+  if (!product) return response.status(404).json({ error: 'Inventory item not found.' })
+  const currentStock = Number(product.stock)
+  const currentValue = Number(product.value || 0)
+  if (!Number.isSafeInteger(currentStock) || currentStock < 0 || !Number.isFinite(currentValue) || currentValue < 0 || currentStock + quantity > Number.MAX_SAFE_INTEGER || currentValue + totalCost > Number.MAX_SAFE_INTEGER) {
+    return response.status(409).json({ error: 'This restock would exceed the supported inventory quantity or value.' })
+  }
+  let supplierName = ''
+  if (supplierId) {
+    const supplier = await database.collection('suppliers').findOne({ id: supplierId, userId }, { projection: { _id: 0, name: 1 } })
+    if (!supplier) return response.status(400).json({ error: 'Choose a valid supplier from your supplier list.' })
+    supplierName = supplier.name
+  }
+  const nextStock = { $add: ['$stock', quantity] }
+  const inventory = await database.collection('inventory').findOneAndUpdate(
+    { id: productId, userId, stock: product.stock, value: product.value },
+    [{ $set: {
+      stock: nextStock,
+      value: { $round: [{ $add: [{ $ifNull: ['$value', 0] }, totalCost] }, 2] },
+      status: { $switch: { branches: [
+        { case: { $eq: [nextStock, 0] }, then: 'Out of stock' },
+        { case: { $lte: [nextStock, '$reorderAt'] }, then: 'Low stock' },
+      ], default: 'In stock' } },
+    } }],
+    { returnDocument: 'after', projection: { _id: 0, userId: 0 } },
+  )
+  if (!inventory) return response.status(409).json({ error: 'Inventory changed before the restock was saved. Refresh and try again.' })
+  const movement = {
+    id: randomUUID(), userId, productId, productName: product.name, sku: product.sku,
+    type: 'restock', quantity, unitCost, totalCost, supplierId, supplierName,
+    receivedAt, note, createdAt: new Date().toISOString(),
+  }
+  try {
+    await database.collection('stockMovements').insertOne(movement)
+  } catch (error) {
+    try {
+      const rolledBackInventory = await changeInventoryForSale(userId, productId, -quantity, -totalCost)
+      if (!rolledBackInventory) throw new Error(`Inventory item ${productId} no longer exists`)
+    } catch (rollbackError) {
+      console.error(`Unable to roll back inventory after failed restock record ${movement.id}:`, rollbackError)
+      return response.status(500).json({ error: 'The stock quantity changed, but its restock record and rollback failed. Check inventory before retrying.' })
+    }
+    console.error(`Unable to save restock record ${movement.id}:`, error)
+    return response.status(500).json({ error: 'Unable to save the restock record. Inventory was rolled back; please try again.' })
+  }
+  response.status(201).json({ inventory, movement: { ...movement, userId: undefined } })
+})
+
 app.post('/api/sales', requireAuth, async (request, response) => {
   const productId = Number(request.body.productId)
   const quantity = Number(request.body.quantity)
@@ -364,6 +435,8 @@ async function connectDatabase() {
       connectedDatabase.collection('expenses').createIndex({ id: -1 }, { unique: true }),
       connectedDatabase.collection('inventory').createIndex({ userId: 1, sku: 1 }, { unique: true }),
       connectedDatabase.collection('inventory').createIndex({ stock: 1, reorderAt: 1 }),
+      connectedDatabase.collection('stockMovements').createIndex({ userId: 1, productId: 1, receivedAt: -1 }),
+      connectedDatabase.collection('stockMovements').createIndex({ userId: 1, id: 1 }, { unique: true }),
       connectedDatabase.collection('sales').createIndex({ userId: 1, date: -1 }),
       connectedDatabase.collection('sales').createIndex({ userId: 1, id: 1 }, { unique: true }),
       connectedDatabase.collection('suppliers').createIndex({ userId: 1, name: 1 }),

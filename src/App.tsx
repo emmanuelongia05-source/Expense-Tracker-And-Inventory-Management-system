@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes, CalendarDays, Car, ChevronDown, CircleDollarSign, Dumbbell, Eye, EyeOff, GraduationCap, HeartPulse, Home, LayoutDashboard, LogIn, Moon, MoreHorizontal, PackagePlus, Plus, Receipt, Search, Settings, ShoppingCart, Sparkles, Store, Sun, Ticket, Utensils, Wallet, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes, CalendarDays, Car, ChevronDown, CircleDollarSign, Dumbbell, Eye, EyeOff, GraduationCap, HeartPulse, History, Home, LayoutDashboard, LogIn, Moon, MoreHorizontal, PackagePlus, Plus, Receipt, Search, Settings, ShoppingCart, Sparkles, Store, Sun, Ticket, Utensils, Wallet, X } from 'lucide-react'
 import './App.css'
 import './Workspace.css'
 import './AuthLayout.css'
@@ -9,6 +9,7 @@ type Expense = { id: number; description: string; category: string; date: string
 type InventoryItem = { id: number; name: string; sku: string; category: string; stock: number; reorderAt: number; value: number; status: 'In stock' | 'Low stock' | 'Out of stock' }
 type Sale = { id: string; productId: number; productName: string; sku: string; quantity: number; unitPrice: number; total: number; customerName: string; date: string }
 type Supplier = { id: string; name: string; contactPerson: string; email: string; phone: string; address: string }
+type RestockRecord = { id: string; productId: number; productName: string; sku: string; quantity: number; unitCost: number; totalCost: number; supplierName: string; receivedAt: string; note: string }
 const initialExpenses: Expense[] = [
   { id: 1, description: 'Wholesale coffee beans', category: 'Inventory', date: 'Today, 09:42', amount: 1840, color: 'mint' },
   { id: 2, description: 'Shop rent - September', category: 'Operations', date: 'Sep 16, 2024', amount: 2200, color: 'lavender' },
@@ -105,6 +106,12 @@ function App() {
   const [showItemForm, setShowItemForm] = useState(false)
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [itemName, setItemName] = useState('')
+  const [restockItem, setRestockItem] = useState<InventoryItem | null>(null)
+  const [restockHistoryItem, setRestockHistoryItem] = useState<InventoryItem | null>(null)
+  const [restockHistory, setRestockHistory] = useState<RestockRecord[]>([])
+  const [loadingRestockHistory, setLoadingRestockHistory] = useState(false)
+  const [savingRestock, setSavingRestock] = useState(false)
+  const restockSubmissionLocked = useRef(false)
   const [showSaleForm, setShowSaleForm] = useState(false)
   const [showSupplierForm, setShowSupplierForm] = useState(false)
   const [saleProductId, setSaleProductId] = useState('')
@@ -190,6 +197,49 @@ function App() {
     setShowItemForm(false)
     setEditingItem(null)
     setItemName('')
+  }
+  const addRestock = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!restockItem || restockSubmissionLocked.current) return
+    restockSubmissionLocked.current = true
+    setSavingRestock(true)
+    const data = new FormData(event.currentTarget)
+    const restock = {
+      quantity: Number(data.get('quantity')),
+      unitCost: Number(data.get('unitCost')),
+      supplierId: String(data.get('supplierId') || ''),
+      receivedAt: String(data.get('receivedAt') || ''),
+      note: String(data.get('note') || '').trim(),
+    }
+    try {
+      const response = await fetch(`/api/inventory/${restockItem.id}/restocks`, { method: 'POST', headers: authHeaders, body: JSON.stringify(restock) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Unable to record restock')
+      setInventory((current) => current.map((item) => item.id === restockItem.id ? result.inventory : item))
+      setRestockItem(null)
+      notify(`${restock.quantity} units added to ${restockItem.name}`)
+    } catch (restockError) {
+      notify(restockError instanceof Error ? restockError.message : 'Unable to record restock')
+    } finally {
+      restockSubmissionLocked.current = false
+      setSavingRestock(false)
+    }
+  }
+  const openRestockHistory = async (item: InventoryItem) => {
+    setRestockHistoryItem(item)
+    setRestockHistory([])
+    setLoadingRestockHistory(true)
+    try {
+      const response = await fetch(`/api/inventory/${item.id}/restocks`, { headers: authHeaders })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Unable to load restock history')
+      setRestockHistory(result)
+    } catch (historyError) {
+      notify(historyError instanceof Error ? historyError.message : 'Unable to load restock history')
+      setRestockHistoryItem(null)
+    } finally {
+      setLoadingRestockHistory(false)
+    }
   }
   const addSale = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -295,7 +345,7 @@ function App() {
         <div className="inventory-table workspace-inventory">
           <div className="table-header"><span>Product</span><span>Stock</span><span>Value</span></div>
           {filteredInventory.length ? filteredInventory.map((item) => <div className="table-row" key={item.id}>
-            <div className="table-product"><span className="product-thumb"><Boxes size={16} /></span><span><strong>{item.name}</strong><small>{item.sku} · {item.category}</small></span><button type="button" className="inventory-edit-button" aria-label={`Edit ${item.name} stock and details`} onClick={() => { setEditingItem(item); setItemName(item.name); setShowItemForm(true) }}>Edit stock</button></div>
+            <div className="table-product"><span className="product-thumb"><Boxes size={16} /></span><span><strong>{item.name}</strong><small>{item.sku} · {item.category}</small></span><div className="inventory-actions"><button type="button" className="inventory-edit-button" aria-label={`Restock ${item.name}`} onClick={() => setRestockItem(item)}><PackagePlus size={13} /><span>Restock</span></button><button type="button" className="inventory-edit-button inventory-history-button" onClick={() => { void openRestockHistory(item) }} aria-label={`View restock history for ${item.name}`}><History size={13} /><span>History</span></button><button type="button" className="inventory-edit-button" aria-label={`Edit ${item.name} stock and details`} onClick={() => { setEditingItem(item); setItemName(item.name); setShowItemForm(true) }}><span>Edit stock</span></button></div></div>
             <span className={`stock-count ${item.status === 'Low stock' ? 'warning' : item.status === 'Out of stock' ? 'danger' : ''}`}>{item.stock} · {item.status}</span>
             <strong>{money(item.value)}</strong>
           </div>) : <div className="workspace-empty"><Boxes size={25} /><strong>No matching products</strong><span>Try another search or add an inventory item.</span></div>}
@@ -393,6 +443,27 @@ function App() {
     </div></main>
     {showExpenseForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowExpenseForm(false)}><form className="modal" onSubmit={addExpense}><div className="modal-header"><div><h2>Add expense</h2><p>Record a new business expense.</p></div><button type="button" className="close-button" onClick={() => setShowExpenseForm(false)} aria-label="Close"><X size={18} /></button></div><label>Description<input name="description" placeholder="e.g. Delivery supplies" required /></label><div className="form-row"><label>Category<select name="category"><option>Fixed expenses</option><option>Shopping</option><option>Food</option><option>Medical</option><option>Transportation</option><option>Fitness</option><option>Entertainment</option><option>Family & education</option><option>Operations</option><option>Inventory</option><option>Marketing</option><option>Payroll</option></select></label><label>Amount<input name="amount" type="number" min="0" step="0.01" placeholder="0.00" required /></label></div><div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowExpenseForm(false)}>Cancel</button><button className="button primary">Save expense</button></div></form></div>}
     {showItemForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && closeItemForm()}><form className="modal" onSubmit={addItem}><div className="modal-header"><div><h2>{editingItem ? 'Edit inventory item' : 'Add inventory item'}</h2><p>{editingItem ? 'Correct product details or stock levels.' : 'Keep your catalog up to date.'}</p></div><button type="button" className="close-button" onClick={closeItemForm} aria-label="Close"><X size={18} /></button></div><label>Product name<input name="name" value={itemName} onChange={(event) => setItemName(event.target.value)} placeholder="e.g. Espresso beans" required /></label><div className="form-row"><label>SKU <span className="optional-label">{editingItem ? 'Stable product code' : 'Auto-generated'}</span><input name="sku" value={editingItem?.sku || generatedSku} readOnly aria-readonly="true" /></label><label>Category<input name="category" defaultValue={editingItem?.category || ''} placeholder="Coffee" required /></label></div><div className="form-row"><label>Units in stock<input name="stock" type="number" min="0" defaultValue={editingItem?.stock} placeholder="0" required /></label><label>Reorder point<input name="reorderAt" type="number" min="0" defaultValue={editingItem?.reorderAt} placeholder="10" required /></label></div><label>Inventory value<input name="value" type="number" min="0" step="0.01" defaultValue={editingItem?.value} placeholder="0.00" required /></label><div className="modal-actions"><button type="button" className="button secondary" onClick={closeItemForm}>Cancel</button><button className="button primary">{editingItem ? 'Save changes' : 'Save item'}</button></div></form></div>}
+    {restockItem && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !savingRestock && setRestockItem(null)}><form className="modal" onSubmit={addRestock}>
+      <div className="modal-header"><div><h2>Restock {restockItem.name}</h2><p>Record the received quantity and purchase details.</p></div><button type="button" className="close-button" onClick={() => { if (!savingRestock) setRestockItem(null) }} aria-label="Close" disabled={savingRestock}><X size={18} /></button></div>
+      <fieldset className="restock-form-fields" disabled={savingRestock}>
+        <p className="form-hint">Current stock: {restockItem.stock} units · Current value: {money(restockItem.value)}</p>
+        <div className="form-row"><label>Units received<input name="quantity" type="number" min="1" step="1" placeholder="e.g. 10" required /></label><label>Cost per unit<input name="unitCost" type="number" min="0" step="0.01" placeholder="0.00" required /></label></div>
+        <label>Supplier <span className="optional-label">Optional</span><select name="supplierId" defaultValue=""><option value="">Select a supplier</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label>
+        <label>Received date<input name="receivedAt" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /></label>
+        <label>Note <span className="optional-label">Optional</span><input name="note" maxLength={300} placeholder="Invoice number or delivery details" /></label>
+      </fieldset>
+      {savingRestock && <p className="sale-saving-status" role="status" aria-live="polite"><span className="sale-spinner" />Recording stock receipt…</p>}
+      <div className="modal-actions"><button type="button" className="button secondary" onClick={() => { if (!savingRestock) setRestockItem(null) }} disabled={savingRestock}>Cancel</button><button className="button primary" disabled={savingRestock}>{savingRestock ? 'Recording…' : 'Save restock'}</button></div>
+    </form></div>}
+    {restockHistoryItem && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setRestockHistoryItem(null)}><section className="modal restock-history-modal" role="dialog" aria-modal="true" aria-labelledby="restock-history-title">
+      <div className="modal-header"><div><h2 id="restock-history-title">{restockHistoryItem.name} · Restock history</h2><p>Current stock: {restockHistoryItem.stock} units</p></div><button type="button" className="close-button" onClick={() => setRestockHistoryItem(null)} aria-label="Close"><X size={18} /></button></div>
+      {loadingRestockHistory ? <p role="status">Loading restock history…</p> : restockHistory.length ? <div className="restock-history-list">{restockHistory.map((entry) => <article className="restock-history-entry" key={entry.id}>
+        <div><strong>+{entry.quantity} units</strong><time>{new Date(`${entry.receivedAt}T00:00:00`).toLocaleDateString()}</time></div>
+        <span>{entry.supplierName || 'Supplier not recorded'} · {money(entry.totalCost)} total ({money(entry.unitCost)}/unit)</span>
+        {entry.note && <small>{entry.note}</small>}
+      </article>)}</div> : <div className="workspace-empty restock-history-empty"><History size={24} /><strong>No restocks recorded yet</strong><span>Use Restock to log incoming stock and see it here.</span></div>}
+      <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setRestockHistoryItem(null)}>Close</button></div>
+    </section></div>}
     {showSaleForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowSaleForm(false)}><form className="modal" onSubmit={addSale}><div className="modal-header"><div><h2>Record sale</h2><p>Record revenue and deduct sold units from inventory.</p></div><button type="button" className="close-button" onClick={() => setShowSaleForm(false)} aria-label="Close"><X size={18} /></button></div><label>Product<select name="productId" value={saleProductId} onChange={(event) => setSaleProductId(event.target.value)} required>{availableProducts.map((item) => <option value={item.id} key={item.id}>{item.name} · {item.stock} in stock</option>)}</select></label><div className="form-row"><label>Quantity<input name="quantity" type="number" min="1" max={selectedSaleProduct?.stock || 1} step="1" placeholder="1" required /></label><label>Unit price<input name="unitPrice" type="number" min="0.01" step="0.01" placeholder="0.00" required /></label></div><label>Customer name <span className="optional-label">Optional</span><input name="customerName" maxLength={120} placeholder="Walk-in customer" /></label>{selectedSaleProduct && <p className="form-hint">{selectedSaleProduct.stock} units available. Stock will update when the sale is saved.</p>}<div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowSaleForm(false)}>Cancel</button><button className="button primary" disabled={!availableProducts.length}>Save sale</button></div></form></div>}
     {showSupplierForm && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowSupplierForm(false)}><form className="modal" onSubmit={addSupplier}><div className="modal-header"><div><h2>Add supplier</h2><p>Save your supplier's contact details.</p></div><button type="button" className="close-button" onClick={() => setShowSupplierForm(false)} aria-label="Close"><X size={18} /></button></div><label>Supplier name<input name="name" maxLength={120} placeholder="e.g. Kampala Coffee Traders" required /></label><label>Contact person<input name="contactPerson" maxLength={120} placeholder="Contact name" /></label><div className="form-row"><label>Email<input name="email" type="email" maxLength={254} placeholder="supplier@business.com" /></label><label>Phone<input name="phone" type="tel" maxLength={40} placeholder="+256 ..." /></label></div><label>Address<input name="address" maxLength={240} placeholder="Supplier location" /></label><div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowSupplierForm(false)}>Cancel</button><button className="button primary">Save supplier</button></div></form></div>}
     {toast && <div className="toast"><span>✓</span>{toast}</div>}
