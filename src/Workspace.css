@@ -38,15 +38,41 @@
 
 .workspace-panel .expense-list,
 .workspace-panel .inventory-table {
+  overflow-x: auto;
   margin-top: 12px;
 }
 
 .workspace-inventory .table-row {
-  grid-template-columns: minmax(0, 1.7fr) minmax(130px, .9fr) minmax(100px, .7fr);
+  min-width: 850px;
+  grid-template-columns: minmax(270px, 1.8fr) minmax(110px, .8fr) minmax(120px, .8fr) minmax(155px, 1fr);
+}
+
+.workspace-inventory .table-header {
+  min-width: 850px;
+  grid-template-columns: minmax(270px, 1.8fr) minmax(110px, .8fr) minmax(120px, .8fr) minmax(155px, 1fr);
 }
 
 .workspace-inventory .stock-count {
   font-size: 10px;
+}
+
+.product-profit {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.product-profit.gain {
+  color: #26815a;
+}
+
+.product-profit.loss,
+.profit-loss-value {
+  color: #c04949 !important;
+}
+
+.product-profit.partial,
+.product-profit.unavailable {
+  color: #9a7a3d;
 }
 
 
@@ -200,7 +226,7 @@
 }
 
 .sales-metrics {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .workspace-data-list {
@@ -236,7 +262,8 @@
 }
 
 .sales-data-row {
-  grid-template-columns: minmax(180px, 1.6fr) minmax(120px, 1fr) 48px minmax(105px, .9fr) minmax(100px, .8fr);
+  grid-template-columns: minmax(180px, 1.6fr) minmax(120px, 1fr) 48px minmax(105px, .9fr) minmax(125px, 1fr) minmax(100px, .8fr);
+  min-width: 900px;
 }
 
 .supplier-data-row {
@@ -568,8 +595,10 @@
     grid-template-columns: 1fr;
   }
 
-  .workspace-inventory .table-row {
-    grid-template-columns: minmax(0, 1.4fr) minmax(90px, .9fr) minmax(85px, .7fr);
+  .workspace-inventory .table-row,
+  .workspace-inventory .table-header {
+    min-width: 850px;
+    grid-template-columns: minmax(270px, 1.8fr) minmax(110px, .8fr) minmax(120px, .8fr) minmax(155px, 1fr);
   }
 
   .workspace-inventory .stock-count {

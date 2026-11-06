@@ -7,7 +7,8 @@ import './AuthLayout.css'
 
 type Expense = { id: number; description: string; category: string; date: string; amount: number; color: string }
 type InventoryItem = { id: number; name: string; sku: string; category: string; stock: number; reorderAt: number; value: number; status: 'In stock' | 'Low stock' | 'Out of stock' }
-type Sale = { id: string; productId: number; productName: string; sku: string; quantity: number; unitPrice: number; total: number; customerName: string; date: string }
+type Sale = { id: string; productId: number; productName: string; sku: string; quantity: number; unitPrice: number; total: number; customerName: string; date: string; unitCost?: number }
+type ProductProfitability = { grossProfit: number; trackedSales: number; untrackedSales: number }
 type Supplier = { id: string; name: string; contactPerson: string; email: string; phone: string; address: string }
 type RestockRecord = { id: string; productId: number; productName: string; sku: string; quantity: number; unitCost: number; totalCost: number; supplierName: string; receivedAt: string; note: string }
 const initialExpenses: Expense[] = [
@@ -25,6 +26,9 @@ const initialInventory: InventoryItem[] = [
 const navItems = [{ label: 'Overview', icon: LayoutDashboard }, { label: 'Expenses', icon: Receipt }, { label: 'Inventory', icon: Boxes }, { label: 'Sales', icon: ShoppingCart }, { label: 'Reports', icon: BarChart3 }]
 const expenseCategories = [{ name: 'Fixed expenses', icon: Home, color: 'sage' }, { name: 'Shopping', icon: Store, color: 'apricot' }, { name: 'Food', icon: Utensils, color: 'rose' }, { name: 'Medical', icon: HeartPulse, color: 'pink' }, { name: 'Transportation', icon: Car, color: 'lilac' }, { name: 'Fitness', icon: Dumbbell, color: 'blue' }, { name: 'Entertainment', icon: Ticket, color: 'teal' }, { name: 'Family & education', icon: GraduationCap, color: 'olive' }]
 const money = (value: number) => `UGX ${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+const saleGrossProfit = (sale: Sale) => typeof sale.unitCost === 'number' && Number.isFinite(sale.unitCost)
+  ? Math.round((sale.total - sale.quantity * sale.unitCost) * 100) / 100
+  : null
 const timeGreeting = (date: Date) => { const hour = date.getHours(); return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening' }
 const skuPrefix = (name: string) => {
   const words = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').match(/[a-z0-9]+/gi) || []
@@ -127,6 +131,27 @@ function App() {
   const totalExpenses = useMemo(() => expenses.reduce((total, expense) => total + expense.amount, 0), [expenses])
   const totalSales = useMemo(() => sales.reduce((total, sale) => total + sale.total, 0), [sales])
   const unitsSold = useMemo(() => sales.reduce((total, sale) => total + sale.quantity, 0), [sales])
+  const salesProfitability = useMemo(() => {
+    const byProduct = new Map<number, ProductProfitability>()
+    let grossProfit = 0
+    let untrackedSales = 0
+
+    for (const sale of sales) {
+      const product = byProduct.get(sale.productId) || { grossProfit: 0, trackedSales: 0, untrackedSales: 0 }
+      const saleProfit = saleGrossProfit(sale)
+      if (saleProfit === null) {
+        product.untrackedSales += 1
+        untrackedSales += 1
+      } else {
+        product.grossProfit = Math.round((product.grossProfit + saleProfit) * 100) / 100
+        product.trackedSales += 1
+        grossProfit = Math.round((grossProfit + saleProfit) * 100) / 100
+      }
+      byProduct.set(sale.productId, product)
+    }
+
+    return { byProduct, grossProfit, untrackedSales }
+  }, [sales])
   const inventoryValue = useMemo(() => inventory.reduce((total, item) => total + item.value, 0), [inventory])
   const stockAlerts = useMemo(() => inventory.filter((item) => item.status !== 'In stock').length, [inventory])
   const notificationItems = useMemo(() => inventory.filter((item) => item.status !== 'In stock').sort((first, second) => first.stock - second.stock), [inventory])
@@ -363,11 +388,19 @@ function App() {
       {activeNav === 'Inventory' && <section className="panel workspace-panel">
         <div className="panel-heading"><div><h2>All inventory</h2><p>{filteredInventory.length} matching products · Total value {money(inventoryValue)}</p></div></div>
         <div className="inventory-table workspace-inventory">
-          <div className="table-header"><span>Product</span><span>Stock</span><span>Value</span></div>
+          <div className="table-header"><span>Product</span><span>Stock</span><span>Value</span><span>Gross profit/loss</span></div>
           {filteredInventory.length ? filteredInventory.map((item) => <div className="table-row" key={item.id}>
             <div className="table-product"><span className="product-thumb"><Boxes size={16} /></span><span><strong>{item.name}</strong><small>{item.sku} · {item.category}</small></span><div className="inventory-actions"><button type="button" className="inventory-edit-button" aria-label={`Restock ${item.name}`} onClick={() => setRestockItem(item)}><PackagePlus size={13} /><span>Restock</span></button><button type="button" className="inventory-edit-button inventory-history-button" onClick={() => { void openRestockHistory(item) }} aria-label={`View restock history for ${item.name}`}><History size={13} /><span>History</span></button><button type="button" className="inventory-edit-button" aria-label={`Edit ${item.name} stock and details`} onClick={() => { setEditingItem(item); setItemName(item.name); setShowItemForm(true) }}><span>Edit stock</span></button></div></div>
             <span className={`stock-count ${item.status === 'Low stock' ? 'warning' : item.status === 'Out of stock' ? 'danger' : ''}`}>{item.stock} · {item.status}</span>
             <strong>{money(item.value)}</strong>
+            {(() => {
+              const profitability = salesProfitability.byProduct.get(item.id)
+              const profitClass = !profitability?.trackedSales ? 'unavailable' : profitability.untrackedSales ? 'partial' : profitability.grossProfit < 0 ? 'loss' : 'gain'
+              const profitLabel = !profitability?.trackedSales
+                ? profitability?.untrackedSales ? 'Cost unavailable' : 'No sales yet'
+                : `${profitability.untrackedSales ? 'Partial · ' : ''}${money(profitability.grossProfit)}`
+              return <span className={`product-profit ${profitClass}`}>{profitLabel}</span>
+            })()}
           </div>) : <div className="workspace-empty"><Boxes size={25} /><strong>No matching products</strong><span>Try another search or add an inventory item.</span></div>}
         </div>
       </section>}
@@ -408,18 +441,23 @@ function App() {
           <article className="metric-card"><div className="metric-top"><span>Total revenue</span><span className="metric-icon green"><CircleDollarSign size={17} /></span></div><strong>{money(totalSales)}</strong><div className="metric-trend neutral">{sales.length} recorded sales</div></article>
           <article className="metric-card"><div className="metric-top"><span>Units sold</span><span className="metric-icon blue"><Boxes size={17} /></span></div><strong>{unitsSold.toLocaleString()}</strong><div className="metric-trend neutral">Across all products</div></article>
           <article className="metric-card"><div className="metric-top"><span>Products available</span><span className="metric-icon yellow"><ShoppingCart size={17} /></span></div><strong>{availableProducts.length}</strong><div className="metric-trend neutral">Ready to sell</div></article>
+          <article className="metric-card"><div className="metric-top"><span>Gross profit/loss</span><span className="metric-icon blue"><CircleDollarSign size={17} /></span></div><strong className={salesProfitability.grossProfit < 0 ? 'profit-loss-value' : ''}>{money(salesProfitability.grossProfit)}</strong><div className="metric-trend neutral">{salesProfitability.untrackedSales ? `${salesProfitability.untrackedSales} sale${salesProfitability.untrackedSales === 1 ? '' : 's'} missing cost data` : 'Revenue less recorded product costs'}</div></article>
         </section>
         <section className="panel workspace-panel">
-          <div className="panel-heading"><div><h2>Sales history</h2><p>{filteredSales.length} matching sales · Revenue {money(totalSales)}</p></div></div>
+          <div className="panel-heading"><div><h2>Sales history</h2><p>{filteredSales.length} matching sales · Revenue {money(totalSales)} · Gross profit/loss excludes operating expenses; older sales without recorded costs are marked unavailable.</p></div></div>
           {filteredSales.length ? <div className="workspace-data-list sales-list">
-            <div className="workspace-data-header sales-data-row"><span>Product</span><span>Customer</span><span>Qty</span><span>Total</span><span>Date</span></div>
-            {filteredSales.map((sale) => <div className="workspace-data-row sales-data-row" key={sale.id}>
-              <span className="workspace-primary-cell"><strong>{sale.productName}</strong><small>{sale.sku} · {money(sale.unitPrice)} each</small></span>
-              <span>{sale.customerName || 'Walk-in customer'}</span>
-              <span>{sale.quantity}</span>
-              <strong>{money(sale.total)}</strong>
-              <span>{new Date(sale.date).toLocaleDateString()}</span>
-            </div>)}
+            <div className="workspace-data-header sales-data-row"><span>Product</span><span>Customer</span><span>Qty</span><span>Total</span><span>Profit/loss</span><span>Date</span></div>
+            {filteredSales.map((sale) => {
+              const profit = saleGrossProfit(sale)
+              return <div className="workspace-data-row sales-data-row" key={sale.id}>
+                <span className="workspace-primary-cell"><strong>{sale.productName}</strong><small>{sale.sku} · {money(sale.unitPrice)} each</small></span>
+                <span>{sale.customerName || 'Walk-in customer'}</span>
+                <span>{sale.quantity}</span>
+                <strong>{money(sale.total)}</strong>
+                {profit === null ? <span className="product-profit unavailable">Cost unavailable</span> : <strong className={`product-profit ${profit < 0 ? 'loss' : 'gain'}`}>{money(profit)}</strong>}
+                <span>{new Date(sale.date).toLocaleDateString()}</span>
+              </div>
+            })}
           </div> : <div className="workspace-empty sales-empty"><ShoppingCart size={25} /><strong>{search ? 'No matching sales' : 'No sales recorded yet'}</strong><span>{search ? 'Try another search.' : availableProducts.length ? 'Record your first sale to track revenue and update stock.' : 'Add inventory with available stock before recording a sale.'}</span>{availableProducts.length > 0 && <button className="button primary" onClick={() => { setSaleProductId(String(availableProducts[0].id)); setShowSaleForm(true) }}><Plus size={16} /> Record sale</button>}</div>}
         </section>
       </>}
