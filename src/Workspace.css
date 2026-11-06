@@ -1160,47 +1160,68 @@
 
 .app-shell .global-search,
 .app-shell .table-search {
-  border: 1px solid #b8d2ed;
-  background: linear-gradient(120deg, #f1f8ff 0%, #edfaff 100%);
-  color: #2672a6;
-  box-shadow: 0 3px 10px #1c5b8b12, inset 0 1px 0 #fff;
+  border: 2px solid #3b88cf;
+  background: linear-gradient(115deg, #e1f0ff 0%, #e3f9ff 55%, #e5fbf4 100%);
+  color: #17628f;
+  box-shadow: 0 5px 15px #1c5b8b20, inset 0 1px 0 #fff;
   transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
 
 .app-shell .global-search {
-  min-height: 38px;
-  border-radius: 12px;
+  min-height: 42px;
+  border-radius: 13px;
 }
 
 .app-shell .table-search {
-  border-radius: 9px;
+  min-height: 42px;
+  border-radius: 10px;
 }
 
 .app-shell .global-search > svg,
 .app-shell .table-search > svg {
   flex: 0 0 auto;
-  color: #277caf;
-  stroke-width: 2.4;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border-radius: 8px;
+  color: #fff;
+  stroke-width: 2.6;
+}
+
+.app-shell .global-search > svg {
+  background: linear-gradient(145deg, #1875d1, #25a5dc);
+  box-shadow: 0 3px 8px #1769b538;
+}
+
+.app-shell .table-search > svg {
+  background: linear-gradient(145deg, #078e86, #16b59b);
+  box-shadow: 0 3px 8px #078e8640;
 }
 
 .app-shell .global-search input,
 .app-shell .table-search input {
   min-height: 22px;
-  color: #173b60;
-  font-weight: 500;
+  color: #102f4c;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .app-shell .global-search input::placeholder,
 .app-shell .table-search input::placeholder {
-  color: #597895;
+  color: #405f7a;
   opacity: 1;
 }
 
 .app-shell .global-search:focus-within,
 .app-shell .table-search:focus-within {
-  border-color: #2788d1;
+  border-color: #176cb6;
   background: #fff;
-  box-shadow: 0 0 0 3px #4ba6e72b, 0 7px 18px #1c5b8b19;
+  box-shadow: 0 0 0 4px #389be43d, 0 8px 20px #1c5b8b24;
+}
+
+.app-shell .global-search:hover,
+.app-shell .table-search:hover {
+  border-color: #236fae;
 }
 
 .app-shell .global-search-results {
@@ -1227,14 +1248,14 @@
 }
 
 .app-shell .search-clear {
-  color: #397ba8;
+  color: #155e9b;
 }
 
 .app-shell .search-clear:hover,
 .app-shell .search-clear:focus-visible {
   outline: 0;
-  background: #dceeff;
-  color: #155a8a;
+  background: #cce8ff;
+  color: #104c7e;
 }
 
 @media (prefers-reduced-motion: reduce) {
