@@ -1264,3 +1264,104 @@
     transition: none;
   }
 }
+
+.app-shell .global-search,
+.app-shell .table-search {
+  box-sizing: border-box;
+  gap: 9px;
+  padding: 5px 10px 5px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(110deg, #f34116, #ec2d0b);
+  box-shadow: 0 5px 14px #c9341833;
+}
+
+.app-shell .global-search {
+  min-height: 48px;
+}
+
+.app-shell .table-search {
+  min-height: 48px;
+}
+
+.app-shell .global-search > svg,
+.app-shell .table-search > svg {
+  order: 3;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  padding: 5px;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: #fff;
+  stroke-width: 2.8;
+}
+
+.app-shell .global-search input,
+.app-shell .table-search input {
+  order: 1;
+  box-sizing: border-box;
+  width: 0;
+  min-width: 0;
+  min-height: 36px;
+  flex: 1 1 auto;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  outline: 0;
+  background: #fff;
+  color: #24364b;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: inset 0 1px 3px #142b4d12;
+}
+
+.app-shell .global-search input::placeholder,
+.app-shell .table-search input::placeholder {
+  color: #69798b;
+}
+
+.app-shell .global-search .search-clear {
+  order: 2;
+  color: #6d7f91;
+}
+
+.app-shell .global-search .search-clear:hover,
+.app-shell .global-search .search-clear:focus-visible {
+  background: #e8f2fa;
+  color: #243f59;
+}
+
+.app-shell .global-search:focus-within,
+.app-shell .table-search:focus-within {
+  border: 0;
+  background: linear-gradient(110deg, #f34116, #ec2d0b);
+  box-shadow: 0 0 0 4px #f3411638, 0 8px 20px #c9341840;
+}
+
+.app-shell .global-search-results {
+  top: calc(100% + 10px);
+  border-color: #f3c1b3;
+}
+
+@media (max-width: 760px) {
+  .app-shell .global-search {
+    min-height: 42px;
+    gap: 5px;
+    padding: 4px 7px 4px 5px;
+  }
+
+  .app-shell .global-search > svg {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+    padding: 4px;
+  }
+
+  .app-shell .global-search input {
+    min-height: 32px;
+    padding-inline: 12px;
+    font-size: 10px;
+  }
+}
