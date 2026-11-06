@@ -206,6 +206,80 @@
   margin: 22px 0;
 }
 
+.business-logo-setting {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid #f0f2ef;
+}
+
+.business-logo-preview {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  overflow: hidden;
+  border: 1px dashed #cbd6ce;
+  border-radius: 12px;
+  background: #f7faf7;
+  color: #829287;
+}
+
+.business-logo-preview img,
+.workspace-switcher .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.business-logo-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.business-logo-copy strong {
+  color: #34433b;
+  font-size: 13px;
+}
+
+.business-logo-copy span {
+  color: #929d97;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.business-logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.business-logo-actions .button {
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.business-logo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.business-logo-input:focus-visible + .button {
+  outline: 2px solid #74a98a;
+  outline-offset: 2px;
+}
+
+
 .settings-panel dl > div {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr);
@@ -1533,5 +1607,21 @@
   .page-sales .sales-metrics .metric-card,
   .page-sales .sales-data-row:not(.workspace-data-header) {
     transition: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .business-logo-setting {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .business-logo-copy {
+    flex-basis: calc(100% - 80px);
+  }
+
+  .business-logo-actions {
+    width: 100%;
+    padding-left: 80px;
   }
 }

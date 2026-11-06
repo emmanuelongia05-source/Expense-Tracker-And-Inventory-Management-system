@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes, CalendarDays, Car, ChevronDown, CircleDollarSign, Dumbbell, Eye, EyeOff, GraduationCap, HeartPulse, History, Home, LayoutDashboard, LogIn, Moon, MoreHorizontal, PackagePlus, Plus, Receipt, Search, Settings, ShoppingCart, Sparkles, Store, Sun, Ticket, Utensils, Wallet, X } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, BarChart3, Bell, Boxes, CalendarDays, Car, ChevronDown, CircleDollarSign, Dumbbell, Eye, EyeOff, GraduationCap, HeartPulse, History, Home, ImagePlus, LayoutDashboard, LogIn, Moon, MoreHorizontal, PackagePlus, Plus, Receipt, Search, Settings, ShoppingCart, Sparkles, Store, Sun, Ticket, Trash2, Utensils, Wallet, X } from 'lucide-react'
 import './App.css'
 import './Workspace.css'
 import './AuthLayout.css'
@@ -37,6 +37,7 @@ const skuPrefix = (name: string) => {
 }
 type Insight = { type: string; title: string; detail: string }
 type AuthUser = { username: string; email: string }
+const businessLogoKey = (username: string) => `ledgerly_business_logo_${encodeURIComponent(username.toLowerCase())}`
 
 function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user: AuthUser, remember: boolean) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -99,6 +100,10 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem('ledgerly_token') || sessionStorage.getItem('ledgerly_token') || '')
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => { const stored = localStorage.getItem('ledgerly_user') || sessionStorage.getItem('ledgerly_user'); return stored ? JSON.parse(stored) : null })
+  const [businessLogo, setBusinessLogo] = useState(() => {
+    const username = currentUser?.username || currentUser?.email
+    return username ? localStorage.getItem(businessLogoKey(username)) || '' : ''
+  })
   const [now, setNow] = useState(() => new Date())
   const [activeNav, setActiveNav] = useState('Overview')
   const [expenses, setExpenses] = useState(initialExpenses)
@@ -173,6 +178,49 @@ function App() {
     return `${prefix}-${String(sequence).padStart(3, '0')}`
   }, [inventory, itemName])
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3000) }
+  const handleBusinessLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      notify('Choose a PNG, JPEG, or WebP image.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      notify('Business logo must be 2 MB or smaller.')
+      return
+    }
+    const username = currentUser?.username || currentUser?.email
+    if (!username) {
+      notify('Sign in before adding a business logo.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onerror = () => notify('Unable to read the selected logo.')
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        notify('Unable to read the selected logo.')
+        return
+      }
+      try {
+        localStorage.setItem(businessLogoKey(username), reader.result)
+        setBusinessLogo(reader.result)
+      } catch (logoError) {
+        notify(logoError instanceof Error ? logoError.message : 'Unable to save business logo')
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+  const removeBusinessLogo = () => {
+    const username = currentUser?.username || currentUser?.email
+    if (!username) return
+    try {
+      localStorage.removeItem(businessLogoKey(username))
+      setBusinessLogo('')
+    } catch (logoError) {
+      notify(logoError instanceof Error ? logoError.message : 'Unable to remove business logo')
+    }
+  }
   useEffect(() => {
     if (!notificationsOpen) return
 
@@ -193,8 +241,8 @@ function App() {
   const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
   useEffect(() => { const clock = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(clock) }, [])
   useEffect(() => { if (!token) return; fetch('/api/data', { headers: { Authorization: `Bearer ${token}` } }).then((response) => response.ok ? response.json() : Promise.reject(new Error('Your session has expired'))).then((data) => { setExpenses(data.expenses.map((expense: Expense) => ({ ...expense, color: expense.color || 'peach' }))); setInventory(data.inventory); setSales(data.sales || []); setSuppliers(data.suppliers || []) }).catch(() => { localStorage.removeItem('ledgerly_token'); localStorage.removeItem('ledgerly_user'); setToken(''); setCurrentUser(null) }) }, [token])
-  const handleAuthenticated = (newToken: string, user: AuthUser, remember: boolean) => { localStorage.removeItem('ledgerly_token'); localStorage.removeItem('ledgerly_user'); sessionStorage.removeItem('ledgerly_token'); sessionStorage.removeItem('ledgerly_user'); const storage = remember ? localStorage : sessionStorage; storage.setItem('ledgerly_token', newToken); storage.setItem('ledgerly_user', JSON.stringify(user)); setToken(newToken); setCurrentUser(user) }
-  const logout = () => { localStorage.removeItem('ledgerly_token'); localStorage.removeItem('ledgerly_user'); sessionStorage.removeItem('ledgerly_token'); sessionStorage.removeItem('ledgerly_user'); setToken(''); setCurrentUser(null); setInsights(null) }
+  const handleAuthenticated = (newToken: string, user: AuthUser, remember: boolean) => { localStorage.removeItem('ledgerly_token'); localStorage.removeItem('ledgerly_user'); sessionStorage.removeItem('ledgerly_token'); sessionStorage.removeItem('ledgerly_user'); const storage = remember ? localStorage : sessionStorage; storage.setItem('ledgerly_token', newToken); storage.setItem('ledgerly_user', JSON.stringify(user)); setBusinessLogo(localStorage.getItem(businessLogoKey(user.username || user.email)) || ''); setToken(newToken); setCurrentUser(user) }
+  const logout = () => { localStorage.removeItem('ledgerly_token'); localStorage.removeItem('ledgerly_user'); sessionStorage.removeItem('ledgerly_token'); sessionStorage.removeItem('ledgerly_user'); setToken(''); setCurrentUser(null); setBusinessLogo(''); setInsights(null) }
   const runAnalysis = () => { setAnalysisLoading(true); fetch('/api/analysis', { method: 'POST', headers: authHeaders, body: JSON.stringify({ expenses, inventory }) }).then((response) => response.json()).then(setInsights).catch(() => notify('Unable to run analysis')).finally(() => setAnalysisLoading(false)) }
   const addExpense = (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); const expense = { description: String(data.get('description') || 'New expense'), category: String(data.get('category') || 'Operations'), amount: Number(data.get('amount')) || 0 }; setExpenses((current) => [{ id: Date.now(), ...expense, date: 'Just now', color: 'peach' }, ...current]); fetch('/api/expenses', { method: 'POST', headers: authHeaders, body: JSON.stringify(expense) }).catch(() => undefined); setShowExpenseForm(false); notify('Expense added to your ledger') }
   const addItem = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -479,6 +527,15 @@ function App() {
 
       {activeNav === 'Settings' && <section className="panel workspace-panel settings-panel">
         <div className="panel-heading"><div><h2>Workspace account</h2><p>Signed-in account details and access.</p></div></div>
+        <div className="business-logo-setting">
+          <div className="business-logo-preview">{businessLogo ? <img src={businessLogo} alt="Business logo preview" /> : <ImagePlus size={23} />}</div>
+          <div className="business-logo-copy"><strong>Business logo</strong><span>Add a logo to personalize your workspace. PNG, JPEG, or WebP, up to 2 MB.</span></div>
+          <div className="business-logo-actions">
+            <input id="business-logo-upload" className="business-logo-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleBusinessLogoChange} />
+            <label className="button secondary" htmlFor="business-logo-upload"><ImagePlus size={16} /> {businessLogo ? 'Change logo' : 'Add logo'}</label>
+            {businessLogo && <button className="button secondary" type="button" onClick={removeBusinessLogo}><Trash2 size={15} /> Remove</button>}
+          </div>
+        </div>
         <dl><div><dt>Username</dt><dd>{currentUser?.username || 'Business owner'}</dd></div><div><dt>Email</dt><dd>{currentUser?.email || 'Not provided'}</dd></div><div><dt>Workspace</dt><dd>Business workspace</dd></div></dl>
         <button className="button secondary" onClick={logout}><LogIn size={16} /> Log out</button>
       </section>}
@@ -487,7 +544,7 @@ function App() {
 
   if (!token) return <AuthScreen onAuthenticated={handleAuthenticated} />
   return <div className={`app-shell page-${activeNav.toLowerCase()}`}>
-    <aside className="sidebar"><div className="brand"><span className="brand-mark"><CircleDollarSign size={20} /></span><span className="brand-copy"><strong>Ledgerly</strong><small>Expense Tracker & Inventory</small></span></div><div className="workspace-switcher"><span className="avatar">{currentUser?.username.slice(0, 2).toUpperCase() || 'BU'}</span><span><strong>{currentUser?.username || 'My business'}</strong><small>Business workspace</small></span><ChevronDown size={15} /></div><nav className="main-nav" aria-label="Main navigation"><p className="nav-label">Workspace</p>{navItems.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${activeNav === label ? 'active' : ''}`} onClick={() => setActiveNav(label)}><Icon size={18} /><span>{label}</span>{label === 'Inventory' && stockAlerts > 0 && <span className="nav-badge">{stockAlerts}</span>}</button>)}<button className={`nav-item ${activeNav === 'Categories' ? 'active' : ''}`} onClick={() => setActiveNav('Categories')}><Ticket size={18} /><span>Categories</span></button><button className={`nav-item ${activeNav === 'Suppliers' ? 'active' : ''}`} onClick={() => setActiveNav('Suppliers')}><ShoppingCart size={18} /><span>Suppliers</span></button><p className="nav-label nav-label-lower">Manage</p><button className={`nav-item ${activeNav === 'Settings' ? 'active' : ''}`} onClick={() => setActiveNav('Settings')}><Settings size={18} /><span>Settings</span></button></nav><section className="sidebar-health"><div className="health-label"><span><i /> Business health</span><span>{inventoryHealth}%</span></div><div className="health-ring" style={{ background: `conic-gradient(#11d6ae ${inventoryHealth}%, #25436a ${inventoryHealth}% 100%)` }}><span><strong>{inventoryHealth}%</strong><small>In stock</small></span></div><div className="health-caption"><ArrowUpRight size={14} /> {inventory.length - stockAlerts}/{inventory.length} products available</div><small className="health-quote">“Better tracking.<br />Smarter decisions.”</small></section><button className="nav-item logout-nav" onClick={logout}><LogIn size={18} /><span>Log out</span></button></aside>
+    <aside className="sidebar"><div className="brand"><span className="brand-mark"><CircleDollarSign size={20} /></span><span className="brand-copy"><strong>Ledgerly</strong><small>Expense Tracker & Inventory</small></span></div><div className="workspace-switcher"><span className="avatar">{businessLogo ? <img src={businessLogo} alt="" /> : currentUser?.username.slice(0, 2).toUpperCase() || 'BU'}</span><span><strong>{currentUser?.username || 'My business'}</strong><small>Business workspace</small></span><ChevronDown size={15} /></div><nav className="main-nav" aria-label="Main navigation"><p className="nav-label">Workspace</p>{navItems.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${activeNav === label ? 'active' : ''}`} onClick={() => setActiveNav(label)}><Icon size={18} /><span>{label}</span>{label === 'Inventory' && stockAlerts > 0 && <span className="nav-badge">{stockAlerts}</span>}</button>)}<button className={`nav-item ${activeNav === 'Categories' ? 'active' : ''}`} onClick={() => setActiveNav('Categories')}><Ticket size={18} /><span>Categories</span></button><button className={`nav-item ${activeNav === 'Suppliers' ? 'active' : ''}`} onClick={() => setActiveNav('Suppliers')}><ShoppingCart size={18} /><span>Suppliers</span></button><p className="nav-label nav-label-lower">Manage</p><button className={`nav-item ${activeNav === 'Settings' ? 'active' : ''}`} onClick={() => setActiveNav('Settings')}><Settings size={18} /><span>Settings</span></button></nav><section className="sidebar-health"><div className="health-label"><span><i /> Business health</span><span>{inventoryHealth}%</span></div><div className="health-ring" style={{ background: `conic-gradient(#11d6ae ${inventoryHealth}%, #25436a ${inventoryHealth}% 100%)` }}><span><strong>{inventoryHealth}%</strong><small>In stock</small></span></div><div className="health-caption"><ArrowUpRight size={14} /> {inventory.length - stockAlerts}/{inventory.length} products available</div><small className="health-quote">“Better tracking.<br />Smarter decisions.”</small></section><button className="nav-item logout-nav" onClick={logout}><LogIn size={18} /><span>Log out</span></button></aside>
     <main className="main-content"><header className="topbar"><div className="global-search"><Search size={17} /><input placeholder="Search expenses, products, or suppliers..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><div className="header-note"><span className="note-mark">✦</span><span>Consistent tracking<br />leads to greater growth.</span></div><div className="top-actions"><button className="date-pill" title={now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}><CalendarDays size={15} /> {now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</button><div className="notification-menu" ref={notificationsRef}>
             <button
               className="icon-button notification-button"
