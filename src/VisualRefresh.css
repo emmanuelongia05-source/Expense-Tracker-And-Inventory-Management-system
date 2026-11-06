@@ -1539,6 +1539,8 @@ body {
 }
 
 .auth-reference-side {
+  display: flex;
+  flex-direction: column;
   width: min(100%, 440px);
   min-height: 0;
   flex: 0 0 auto;
