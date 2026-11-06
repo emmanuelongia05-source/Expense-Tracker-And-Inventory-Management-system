@@ -1565,6 +1565,7 @@ body {
   position: relative;
   z-index: 1;
   display: block;
+  flex: 0 0 auto;
   margin: 0;
   padding: 0;
 }
