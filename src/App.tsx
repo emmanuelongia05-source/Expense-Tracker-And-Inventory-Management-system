@@ -116,6 +116,8 @@ function App() {
   const [showSupplierForm, setShowSupplierForm] = useState(false)
   const [saleProductId, setSaleProductId] = useState('')
   const [toast, setToast] = useState('')
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationsRef = useRef<HTMLDivElement>(null)
   const [insights, setInsights] = useState<{ summary: string; insights: Insight[]; provider?: string } | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const filteredInventory = useMemo(() => inventory.filter((item) => `${item.name} ${item.sku} ${item.category}`.toLowerCase().includes(search.toLowerCase())), [inventory, search])
@@ -127,6 +129,7 @@ function App() {
   const unitsSold = useMemo(() => sales.reduce((total, sale) => total + sale.quantity, 0), [sales])
   const inventoryValue = useMemo(() => inventory.reduce((total, item) => total + item.value, 0), [inventory])
   const stockAlerts = useMemo(() => inventory.filter((item) => item.status !== 'In stock').length, [inventory])
+  const notificationItems = useMemo(() => inventory.filter((item) => item.status !== 'In stock').sort((first, second) => first.stock - second.stock), [inventory])
   const categoryTotals = useMemo(() => expenses.reduce<Record<string, number>>((totals, expense) => { totals[expense.category] = (totals[expense.category] || 0) + expense.amount; return totals }, {}), [expenses])
   const outOfStockCount = useMemo(() => inventory.filter((item) => item.stock === 0).length, [inventory])
   const lowStockCount = useMemo(() => inventory.filter((item) => item.stock > 0 && item.stock <= item.reorderAt).length, [inventory])
@@ -145,6 +148,23 @@ function App() {
     return `${prefix}-${String(sequence).padStart(3, '0')}`
   }, [inventory, itemName])
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3000) }
+  useEffect(() => {
+    if (!notificationsOpen) return
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (event.target instanceof Node && !notificationsRef.current?.contains(event.target)) setNotificationsOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNotificationsOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [notificationsOpen])
   const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
   useEffect(() => { const clock = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(clock) }, [])
   useEffect(() => { if (!token) return; fetch('/api/data', { headers: { Authorization: `Bearer ${token}` } }).then((response) => response.ok ? response.json() : Promise.reject(new Error('Your session has expired'))).then((data) => { setExpenses(data.expenses.map((expense: Expense) => ({ ...expense, color: expense.color || 'peach' }))); setInventory(data.inventory); setSales(data.sales || []); setSuppliers(data.suppliers || []) }).catch(() => { localStorage.removeItem('ledgerly_token'); localStorage.removeItem('ledgerly_user'); setToken(''); setCurrentUser(null) }) }, [token])
@@ -430,7 +450,38 @@ function App() {
   if (!token) return <AuthScreen onAuthenticated={handleAuthenticated} />
   return <div className={`app-shell page-${activeNav.toLowerCase()}`}>
     <aside className="sidebar"><div className="brand"><span className="brand-mark"><CircleDollarSign size={20} /></span><span className="brand-copy"><strong>Ledgerly</strong><small>Expense Tracker & Inventory</small></span></div><div className="workspace-switcher"><span className="avatar">{currentUser?.username.slice(0, 2).toUpperCase() || 'BU'}</span><span><strong>{currentUser?.username || 'My business'}</strong><small>Business workspace</small></span><ChevronDown size={15} /></div><nav className="main-nav" aria-label="Main navigation"><p className="nav-label">Workspace</p>{navItems.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${activeNav === label ? 'active' : ''}`} onClick={() => setActiveNav(label)}><Icon size={18} /><span>{label}</span>{label === 'Inventory' && stockAlerts > 0 && <span className="nav-badge">{stockAlerts}</span>}</button>)}<button className={`nav-item ${activeNav === 'Categories' ? 'active' : ''}`} onClick={() => setActiveNav('Categories')}><Ticket size={18} /><span>Categories</span></button><button className={`nav-item ${activeNav === 'Suppliers' ? 'active' : ''}`} onClick={() => setActiveNav('Suppliers')}><ShoppingCart size={18} /><span>Suppliers</span></button><p className="nav-label nav-label-lower">Manage</p><button className={`nav-item ${activeNav === 'Settings' ? 'active' : ''}`} onClick={() => setActiveNav('Settings')}><Settings size={18} /><span>Settings</span></button></nav><section className="sidebar-health"><div className="health-label"><span><i /> Business health</span><span>{inventoryHealth}%</span></div><div className="health-ring" style={{ background: `conic-gradient(#11d6ae ${inventoryHealth}%, #25436a ${inventoryHealth}% 100%)` }}><span><strong>{inventoryHealth}%</strong><small>In stock</small></span></div><div className="health-caption"><ArrowUpRight size={14} /> {inventory.length - stockAlerts}/{inventory.length} products available</div><small className="health-quote">“Better tracking.<br />Smarter decisions.”</small></section><button className="nav-item logout-nav" onClick={logout}><LogIn size={18} /><span>Log out</span></button></aside>
-    <main className="main-content"><header className="topbar"><div className="global-search"><Search size={17} /><input placeholder="Search expenses, products, or suppliers..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><div className="header-note"><span className="note-mark">✦</span><span>Consistent tracking<br />leads to greater growth.</span></div><div className="top-actions"><button className="date-pill" title={now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}><CalendarDays size={15} /> {now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</button><button className="icon-button" aria-label="Notifications" onClick={() => notify('You are all caught up')}><Bell size={18} /><i /></button><button className="account-profile" onClick={logout} title="Log out"><span className="top-avatar account-button">{currentUser?.username.slice(0, 2).toUpperCase() || 'BU'}</span><span className="profile-copy"><strong>{currentUser?.username || 'Business owner'}</strong><small>Business owner</small></span><ChevronDown size={14} /></button></div></header><div className="content-wrap">
+    <main className="main-content"><header className="topbar"><div className="global-search"><Search size={17} /><input placeholder="Search expenses, products, or suppliers..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><div className="header-note"><span className="note-mark">✦</span><span>Consistent tracking<br />leads to greater growth.</span></div><div className="top-actions"><button className="date-pill" title={now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}><CalendarDays size={15} /> {now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</button><div className="notification-menu" ref={notificationsRef}>
+            <button
+              className="icon-button notification-button"
+              type="button"
+              aria-label={`Notifications${notificationItems.length ? `, ${notificationItems.length} stock alerts` : ''}`}
+              aria-expanded={notificationsOpen}
+              aria-controls="notification-panel"
+              onClick={() => setNotificationsOpen((open) => !open)}
+            >
+              <Bell size={18} />
+              {notificationItems.length > 0 && <span className="notification-count">{notificationItems.length}</span>}
+            </button>
+            {notificationsOpen && <section className="notification-panel" id="notification-panel" aria-label="Notifications">
+              <div className="notification-heading">
+                <div><h2>Notifications</h2><p>{notificationItems.length ? `${notificationItems.length} item${notificationItems.length === 1 ? '' : 's'} need attention` : 'Inventory status'}</p></div>
+                <button className="notification-close" type="button" aria-label="Close notifications" onClick={() => setNotificationsOpen(false)}><X size={16} /></button>
+              </div>
+              {notificationItems.length ? <div className="notification-list">
+                {notificationItems.map((item) => <button
+                  className="notification-item"
+                  key={item.id}
+                  type="button"
+                  onClick={() => { setActiveNav('Inventory'); setNotificationsOpen(false) }}
+                >
+                  <span className={`notification-icon ${item.status === 'Out of stock' ? 'out' : 'low'}`}><Boxes size={16} /></span>
+                  <span className="notification-copy"><strong>{item.name}</strong><small>{item.stock} in stock · Reorder at {item.reorderAt}</small></span>
+                  <span className={`notification-status ${item.status === 'Out of stock' ? 'out' : 'low'}`}>{item.status}</span>
+                </button>)}
+              </div> : <div className="notification-empty"><span>✓</span><strong>You’re all caught up</strong><small>No inventory items need attention right now.</small></div>}
+              <button className="notification-footer" type="button" onClick={() => { setActiveNav('Inventory'); setNotificationsOpen(false) }}>View inventory <ArrowUpRight size={14} /></button>
+            </section>}
+          </div><button className="account-profile" onClick={logout} title="Log out"><span className="top-avatar account-button">{currentUser?.username.slice(0, 2).toUpperCase() || 'BU'}</span><span className="profile-copy"><strong>{currentUser?.username || 'Business owner'}</strong><small>Business owner</small></span><ChevronDown size={14} /></button></div></header><div className="content-wrap">
       <section className="page-heading"><div><p className="eyebrow">{now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} <span className="current-time">· {now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span></p><h1>{timeGreeting(now)}, {currentUser?.username || 'there'} <span>👋</span></h1><p className="subheading">Here is what is happening with your business today.</p></div><div className="heading-actions"><button className="button secondary" onClick={() => setShowExpenseForm(true)}><Plus size={17} /> Add expense</button><button className="button primary" onClick={() => setShowItemForm(true)}><PackagePlus size={17} /> Add inventory</button></div></section>
       <section className="metric-grid reference-metrics" aria-label="Business summary"><article className="metric-card"><div className="metric-top"><span>Total expenses</span><span className="metric-icon green"><Wallet size={17} /></span></div><strong>{money(totalExpenses)}</strong><div className="metric-trend up"><ArrowDownRight size={14} /> {expenses.length} <span>recorded entries</span></div></article><article className="metric-card"><div className="metric-top"><span>Total inventory value</span><span className="metric-icon blue"><Boxes size={17} /></span></div><strong>{money(inventoryValue)}</strong><div className="metric-trend up"><ArrowUpRight size={14} /> {inventory.length} <span>tracked products</span></div></article><article className="metric-card"><div className="metric-top"><span>Expense categories</span><span className="metric-icon violet"><Receipt size={17} /></span></div><strong>{Object.keys(categoryTotals).length}</strong><div className="metric-trend neutral"><span>Categories with recorded spending</span></div></article><article className="metric-card"><div className="metric-top"><span>Stock alerts</span><span className="metric-icon orange"><Boxes size={17} /></span></div><strong>{stockAlerts}</strong><div className="metric-trend down"><ArrowDownRight size={14} /> {outOfStockCount} out of stock <span>· {lowStockCount} low</span></div></article></section>
       <section className="reference-grid"><article className="panel expense-overview"><div className="panel-heading"><div><h2>Expense overview</h2><p>Recorded spending by category</p></div><span className="period-label"><CalendarDays size={14} /> This account</span></div>{categoryBreakdown.length ? <div className="expense-breakdown"><div className="donut-wrap"><div className="expense-donut" style={{ background: `conic-gradient(${categoryBreakdown.map((_, index) => `${['#1677ed', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#64748b'][index % 6]} ${categoryBreakdown.slice(0, index).reduce((sum, previous) => sum + previous.percent, 0)}% ${categoryBreakdown.slice(0, index + 1).reduce((sum, current) => sum + current.percent, 0)}%`).join(', ')})` }}><span><small>Total expenses</small><strong>{money(totalExpenses)}</strong></span></div></div><div className="category-legend">{categoryBreakdown.slice(0, 6).map((item, index) => <div className="legend-row" key={item.name}><i style={{ background: ['#1677ed', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#64748b'][index % 6] }} /><span>{item.name}</span><strong>{money(item.amount)}</strong><small>{item.percent}%</small></div>)}</div></div> : <div className="empty-chart"><Receipt size={25} /><strong>No expenses recorded yet</strong><span>Add an expense to see your category breakdown.</span></div>}</article><article className="panel stock-panel reference-stock"><div className="panel-heading"><div><h2>Inventory stock levels</h2><p>Stock that may need attention</p></div><button className="text-button" onClick={() => setActiveNav('Inventory')}>View all <ArrowUpRight size={14} /></button></div><div className="reference-stock-list">{inventory.slice(0, 6).map((item) => <div className="reference-stock-row" key={item.id}><span className="reference-product-icon"><Boxes size={17} /></span><span className="reference-product"><strong>{item.name}</strong><small>{item.stock} units · {item.sku}</small></span><span className={`table-status ${item.status === 'In stock' ? 'good' : item.status === 'Low stock' ? 'warning' : 'danger'}`}>{item.status}</span></div>)}</div></article><article className="panel quick-actions"><div className="panel-heading"><div><h2>Quick actions</h2><p>Common tasks</p></div></div><button className="quick-action expense-action" onClick={() => setShowExpenseForm(true)}><Plus size={18} /><span><strong>Add expense</strong><small>Record a new expense</small></span></button><button className="quick-action inventory-action" onClick={() => setShowItemForm(true)}><PackagePlus size={18} /><span><strong>Add product</strong><small>Update inventory stock</small></span></button><button className="quick-action reports-action" onClick={runAnalysis}><BarChart3 size={18} /><span><strong>View reports</strong><small>Analyze your business data</small></span></button></article></section>
