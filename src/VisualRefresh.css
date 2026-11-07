@@ -1562,7 +1562,7 @@ body {
   flex: 0 0 auto;
   overflow: visible;
   gap: 0;
-  padding: 21px 24px 17px;
+  padding: 21px 24px 0;
   background:
     radial-gradient(ellipse at 86% 100%, #59b6874a, transparent 48%),
     linear-gradient(145deg, #153d2b, #1d5e40 58%, #247c50);
@@ -1649,7 +1649,7 @@ body {
   --ref-line: #dfe9e2;
   --ref-blue: #237451;
   max-width: none;
-  padding: 20px 26px 24px;
+  padding: 8px 26px 24px;
   border-top: 0;
   border-radius: 0;
   box-shadow: none;
@@ -1673,6 +1673,10 @@ body {
 
 .ref-form-heading > div {
   min-width: 0;
+}
+
+.ref-form-heading h2 {
+  margin-top: 0;
 }
 
 .ref-form-wrap > h2 {
@@ -1738,7 +1742,7 @@ body {
   .auth-reference-side {
     width: 100%;
     min-height: 0;
-    padding: 23px 20px 19px;
+    padding: 23px 20px 0;
   }
 
   .auth-reference-main {
@@ -1754,11 +1758,11 @@ body {
   }
 
   .auth-reference-side {
-    padding: 19px 17px 15px;
+    padding: 19px 17px 0;
   }
 
   .ref-form-wrap {
-    padding: 21px 19px;
+    padding: 8px 19px 21px;
   }
 
   .ref-form-heading {
