@@ -1,13 +1,13 @@
 :root {
-  color: #23352e;
-  background: #f4f7f5;
+  color: #1d3042;
+  background: #edf3f8;
   font-family: 'DM Sans', 'Segoe UI', sans-serif;
   --surface: #fff;
-  --surface-muted: #f7faf8;
-  --text-strong: #20342b;
-  --text: #52635a;
-  --text-muted: #78877e;
-  --border: #e2eae5;
+  --surface-muted: #f5f8fb;
+  --text-strong: #1d3042;
+  --text: #40566b;
+  --text-muted: #627588;
+  --border: #dce5ee;
   --accent: #237451;
   --accent-strong: #195e40;
   --accent-soft: #eaf5ee;
@@ -15,13 +15,13 @@
 }
 
 body {
-  background: #f4f7f5;
-  color: #23352e;
+  background: #edf3f8;
+  color: #1d3042;
 }
 
 .app-shell {
   min-height: 100vh;
-  background: #f4f7f5;
+  background: #edf3f8;
   color: var(--text-strong);
 }
 
@@ -117,8 +117,9 @@ body {
 .main-content {
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 82% 0, #eaf4ee88, transparent 32%),
-    #f4f7f5;
+    radial-gradient(ellipse at 8% 0, #dcecffb0, transparent 34%),
+    radial-gradient(ellipse at 96% 24%, #dff2e9a6, transparent 32%),
+    #edf3f8;
 }
 
 .topbar {
@@ -203,7 +204,7 @@ body {
 
 .eyebrow {
   margin-bottom: 9px;
-  color: #74877b;
+  color: #536a7e;
   font-size: 10px;
   letter-spacing: .09em;
 }
@@ -221,9 +222,13 @@ body {
 }
 
 .subheading {
-  color: #68796f;
+  color: #53697d;
   font-size: 13px;
   line-height: 1.55;
+}
+
+.page-view-heading .eyebrow {
+  color: #536a7e;
 }
 
 .heading-actions {
