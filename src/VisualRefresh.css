@@ -136,30 +136,6 @@ body {
 
 .global-search {
   width: min(100%, 470px);
-  min-height: 42px;
-  padding: 4px 10px;
-  border: 1px solid #dce7e0 !important;
-  border-radius: 12px !important;
-  background: #f7faf8 !important;
-  box-shadow: none !important;
-  color: #6f8176 !important;
-}
-
-.global-search:focus-within {
-  border-color: #83b398 !important;
-  background: #fff !important;
-  box-shadow: 0 0 0 3px #dcefe366 !important;
-}
-
-.global-search input {
-  width: 100%;
-  min-height: 32px;
-  color: var(--text-strong) !important;
-  font-size: 12px !important;
-}
-
-.global-search input::placeholder {
-  color: #8b9a91 !important;
 }
 
 .search-clear {

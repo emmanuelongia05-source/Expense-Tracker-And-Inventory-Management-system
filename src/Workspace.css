@@ -1443,26 +1443,6 @@
   border-color: #f3c1b3;
 }
 
-@media (max-width: 760px) {
-  .app-shell .global-search {
-    min-height: 42px;
-    gap: 5px;
-    padding: 4px 7px 4px 5px;
-  }
-
-  .app-shell .global-search > svg {
-    width: 30px;
-    height: 30px;
-    flex-basis: 30px;
-    padding: 4px;
-  }
-
-  .app-shell .global-search input {
-    min-height: 32px;
-    padding-inline: 12px;
-    font-size: 10px;
-  }
-}
 
 .page-sales .page-view-heading h1 {
   color: #173d68;
