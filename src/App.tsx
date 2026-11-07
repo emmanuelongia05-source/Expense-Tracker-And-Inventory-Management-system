@@ -73,14 +73,18 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user
   }
 
   return <main className={`auth-reference ${theme}`}>
+    <div className="auth-card">
     <aside className="auth-reference-side">
       <div className="ref-brand"><span className="ref-brand-icon"><Boxes size={23} /></span><strong>Ledgerly</strong></div>
       <div className="ref-intro"><h1>Expense Tracker &amp;<br />Inventory Management</h1><p>Smarter control over your expenses, inventory and suppliers, all in one place.</p></div>
       <div className="ref-benefits"><span>Track expenses</span><span>Manage inventory</span><span>Stock alerts</span><span>Reports</span></div>
     </aside>
     <section className="auth-reference-main">
-      <button className="ref-theme-toggle" type="button" onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}><span>{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}</span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button>
-      <div className="ref-form-wrap"><h2>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h2><p className="ref-subtitle">{mode === 'login' ? 'Sign in to your expense and inventory dashboard.' : 'Create an account to manage your business.'}</p>
+      <div className="ref-form-wrap">
+        <div className="ref-form-heading">
+          <div><h2>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h2><p className="ref-subtitle">{mode === 'login' ? 'Sign in to your expense and inventory dashboard.' : 'Create an account to manage your business.'}</p></div>
+          <button className="ref-theme-toggle" type="button" onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}><span>{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}</span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button>
+        </div>
         <form onSubmit={submit} className="ref-form">
           {mode === 'login' ? <div className="ref-field"><label htmlFor="auth-identifier">Username or email</label><input id="auth-identifier" value={identifier} onChange={(event) => setIdentifier(event.target.value)} autoComplete="username" placeholder="you@business.com" required /></div> : <><div className="ref-field"><label htmlFor="auth-username">Username</label><input id="auth-username" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="Choose a username" required /></div><div className="ref-field"><label htmlFor="auth-email">Email</label><input id="auth-email" value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" placeholder="you@business.com" required /></div></>}
           <div className="ref-field"><label htmlFor="auth-password">Password</label><div className="ref-password"><input id="auth-password" value={password} onChange={(event) => setPassword(event.target.value)} onKeyUp={(event) => setCapsLock(event.getModifierState('CapsLock'))} onKeyDown={(event) => setCapsLock(event.getModifierState('CapsLock'))} onBlur={() => setCapsLock(false)} type={showPassword ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="Enter your password" minLength={8} required /><button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div>{capsLock && <p className="ref-caps" role="status">Caps Lock is on.</p>}</div>
@@ -94,6 +98,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user
         <nav className="ref-legal" aria-label="Legal links"><a href="#terms">Terms</a><a href="#privacy">Privacy</a><a href="#help">Help centre</a></nav>
       </div>
     </section>
+    </div>
   </main>
 }
 
